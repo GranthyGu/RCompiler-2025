@@ -369,6 +369,7 @@ public class Parser {
             case "|=":
             case "<<=":
             case ">>=":
+            case "as":
                 return 1;
             case "||":
                 return 2;
@@ -407,6 +408,9 @@ public class Parser {
         }
     }
     private BinaryExpression ParseBinaryExpression(Expression left, int priority) {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         String operator;
         if (tk.token_type == TokenType.OPERATOR) {
@@ -435,6 +439,9 @@ public class Parser {
         return new BinaryExpression(left, operator, right, null);
     }
     private UnaryExpression ParseUnaryExpression() {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         String operator = "";
         boolean ismut = false;
@@ -453,6 +460,9 @@ public class Parser {
         return new UnaryExpression(operator, right, ismut);
     }
     private LiteralExpression ParseLiteralExpression() {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         Object ob = new Object();
         if (tk.token_type == TokenType.CHAR_LITERAL || tk.token_type == TokenType.STRING_LITERAL || tk.token_type == TokenType.INTERGER_LITERAL) {
@@ -468,9 +478,12 @@ public class Parser {
         return new LiteralExpression(ob, tk.token_type);
     }
     private IdentifierExpression ParseIdentifierExpression() {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         String name = "";
-        if (tk.token_type == TokenType.IDENTIFIER) {
+        if (tk.token_type == TokenType.IDENTIFIER || tk.value.equals("self") || tk.value.equals("Self")) {
             name = tk.value;
             current_index++;
         } else {
@@ -480,6 +493,9 @@ public class Parser {
         return new IdentifierExpression(name);
     }
     private CallFuncExpression ParseCallFuncExpression(Expression left) {
+        if (has_error) {
+            return null;
+        }
         List<Expression> list = new ArrayList<>();
         if (tokens.get(current_index).value.equals("(")) {
             current_index++;
@@ -513,6 +529,9 @@ public class Parser {
         return new CallFuncExpression(left, list);
     }
     private CallMethodExpression ParseCallMethodExpression(Expression left) {
+        if (has_error) {
+            return null;
+        }
         Token tk_ = tokens.get(current_index);
         if (tk_.value.equals(".")) {
             current_index++;
@@ -562,6 +581,9 @@ public class Parser {
         return new CallMethodExpression(left, identifier, list);
     }
     private ArrIndexExpression ParseArrIndexExpression(Expression left) {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("[")) {
             current_index++;
         } else {
@@ -582,6 +604,9 @@ public class Parser {
         return new ArrIndexExpression(left, exp2);
     }
     private FieldExpression ParseFieldExpression(Expression left) {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals(".")) {
             current_index++;
         } else {
@@ -598,6 +623,9 @@ public class Parser {
         return new FieldExpression(left, tk.value);
     }
     private BlockExpression ParseBlockExpression() {
+        if (has_error) {
+            return null;
+        }
         boolean isconst = false;
         if (tokens.get(current_index).value.equals("const")) {
             isconst = true;
@@ -610,7 +638,8 @@ public class Parser {
             return null;
         }
         List<Statement> list = new ArrayList<>();
-        while (true) {
+        while (true && !has_error) {
+            // System.out.println(current_index);
             Token tk = tokens.get(current_index);
             if (tk.value.equals("}")) {
                 current_index++;
@@ -632,6 +661,9 @@ public class Parser {
         return new BlockExpression(list, null, isconst);
     }
     private BreakExpression ParseBreakExpression() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("break")) {
             current_index++;
         } else {
@@ -644,6 +676,9 @@ public class Parser {
         return new BreakExpression(exp);
     }
     private ReturnExpression ParseReturnExpression() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("return")) {
             current_index++;
         } else {
@@ -656,6 +691,9 @@ public class Parser {
         return new ReturnExpression(exp);
     }
     private LoopExpression ParseLoopExpression() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("loop")) {
             current_index++;
         } else {
@@ -666,6 +704,9 @@ public class Parser {
         return new LoopExpression(block);
     }
     private WhileExpression ParseWhileExpression() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("while")) {
             current_index++;
         } else {
@@ -693,6 +734,9 @@ public class Parser {
         return new WhileExpression(exp, block);
     }
     private StructExpression ParseStructExpression() {
+        if (has_error) {
+            return null;
+        }
         String path = "";
         String sub_path = "";
         if (tokens.get(current_index).token_type == TokenType.IDENTIFIER || tokens.get(current_index).value.equals("self") 
@@ -722,7 +766,7 @@ public class Parser {
         }
         List<StructExprField> list = new ArrayList<>();
         boolean flag = true;
-        while (true) {
+        while (true && !has_error) {
             Token tk = tokens.get(current_index);
             if (tk.value.equals("}")) {
                 current_index++;
@@ -757,6 +801,9 @@ public class Parser {
         return new StructExpression(path, sub_path, list);
     }
     private IfExpression ParseIfExpression() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("if")) {
             current_index++;
         } else {
@@ -793,6 +840,9 @@ public class Parser {
         return new IfExpression(exp, block, null);
     }
     private PathExpression ParsePathExpression() {
+        if (has_error) {
+            return null;
+        }
         String path = "";
         String sub_path = "";
         if (tokens.get(current_index).token_type == TokenType.IDENTIFIER || tokens.get(current_index).value.equals("self") 
@@ -818,6 +868,9 @@ public class Parser {
         return new PathExpression(path, null);
     }
     private ArrayExpression ParseArrayExpression() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("[")) {
             current_index++;
         } else {
@@ -852,6 +905,9 @@ public class Parser {
         return new ArrayExpression(list);
     }
     private GroupedExpression ParseGroupedExpression() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("(")) {
             current_index++;
         } else {
@@ -868,6 +924,9 @@ public class Parser {
         return new GroupedExpression(exp);
     }
     private Expression ParseIdentifierBasedExpression() {
+        if (has_error) {
+            return null;
+        }
         int index = current_index;
         if (current_index + 1 < tokens.size() && tokens.get(current_index + 1).value.equals("::")) {
             current_index += 2;
@@ -890,6 +949,9 @@ public class Parser {
         return null;
     }
     private Expression ParseAtomExpression() {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         if (tk.value.equals("{")) {
             return ParseBlockExpression();
@@ -929,6 +991,9 @@ public class Parser {
         return null;
     }
     private Expression ParseExpression_(int priority) {
+        if (has_error) {
+            return null;
+        }
         Expression exp = ParseAtomExpression();
         if (exp == null) {
             return null;
@@ -957,7 +1022,7 @@ public class Parser {
                     tk.value.equals("<<") || tk.value.equals(">>") || tk.value.equals("..") ||
                     tk.value.equals("..=") || tk.value.equals("...") || tk.value.equals("%=") ||
                     tk.value.equals("^=") || tk.value.equals("&=") || tk.value.equals("|=") ||
-                    tk.value.equals("<<=") || tk.value.equals(">>=")) {
+                    tk.value.equals("<<=") || tk.value.equals(">>=") || tk.value.equals("as")) {
                 int priority_ = GetPriority(tk.value);
                 if (priority_ <= priority) {
                     break;
@@ -974,6 +1039,10 @@ public class Parser {
         return ParseExpression_(0);
     }
     private boolean isStatement() {
+        if (tokens.get(current_index).value.equals("if") || tokens.get(current_index).value.equals("loop") 
+            || tokens.get(current_index).value.equals("while") || tokens.get(current_index).value.equals("let")) {
+            return true;
+        }
         boolean flag = false;
         int index = current_index;
         while (index < tokens.size()) {
@@ -989,6 +1058,9 @@ public class Parser {
         return flag;
     }
     private LetStatement ParseLetStatement() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("let")) {
             current_index++;
         } else {
@@ -996,13 +1068,11 @@ public class Parser {
             return null;
         }
         Pattern pt = ParsePattern();
+        Type tp = null;
         if (tokens.get(current_index).value.equals(":")) {
             current_index++;
-        } else {
-            has_error = true;
-            return null;
+            tp = ParseType();
         }
-        Type tp = ParseType();
         if (tokens.get(current_index).value.equals("=")) {
             current_index++;
             Expression exp = ParseExpression();
@@ -1022,17 +1092,22 @@ public class Parser {
         }
     }
     private ExpressionStatement ParseExpressionStatement() {
+        if (has_error) {
+            return null;
+        }
         Expression exp = ParseExpression();
         if (tokens.get(current_index).value.equals(";")) {
             current_index++;
-        } else {
+        } else if (!tokens.get(current_index - 1).value.equals("}")) {
             has_error = true;
             return null;
         }
         return new ExpressionStatement(exp);
     }
     private Statement ParseStatement() {
-        // Consider the Item
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("let")) {
             return ParseLetStatement();
         } else if (tokens.get(current_index).value.equals("fn") || 
@@ -1051,6 +1126,9 @@ public class Parser {
         }
     }
     private Item ParseItems() {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         if (tk.value.equals("fn")) {
             return ParseFunctionItem();
@@ -1059,7 +1137,7 @@ public class Parser {
         } else if (tk.value.equals("enum")) {
             return ParseEnumItem();
         } else if (tk.value.equals("const")) {
-            if (current_index + 1 < tokens.size() && tokens.get(current_index + 1).value == "fn") {
+            if (current_index + 1 < tokens.size() && tokens.get(current_index + 1).value.equals("fn")) {
                 return ParseFunctionItem();
             } else {
                 return ParseConstItem();
@@ -1074,6 +1152,9 @@ public class Parser {
         }
     }
     private Type ParseType() {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         if (tk.value.equals("&")) {
             current_index++;
@@ -1117,6 +1198,9 @@ public class Parser {
         return null;
     }
     private Pattern ParsePattern() {
+        if (has_error) {
+            return null;
+        }
         Token tk = tokens.get(current_index);
         if (tk.value.equals("_")) {
             current_index++;
@@ -1143,7 +1227,7 @@ public class Parser {
             }
             Pattern sub = ParsePattern();
             return new ReferencePattern(isMut, sub);
-        } else if (tk.token_type == TokenType.IDENTIFIER || tk.value.equals("self") || tk.value.equals("Self")) {
+        } else if (tk.token_type == TokenType.IDENTIFIER || tk.value.equals("self") || tk.value.equals("Self") || tk.token_type == TokenType.STRICT_KEYWORD) {
             current_index++;
             Token next_token = tokens.get(current_index);
             if (tk.value.equals("mut") || tk.value.equals("ref")) {
@@ -1184,16 +1268,16 @@ public class Parser {
                     return null;
                 }
                 current_index++;
-                if (tokens.get(current_index).value == "(") {
+                if (tokens.get(current_index).value.equals("(")) {
                     current_index++;
                     List<Pattern> list = new ArrayList<>();
                     boolean flag = true;
                     while (true) {
                         Token new_token = tokens.get(current_index);
-                        if (new_token.value == ")") {
+                        if (new_token.value.equals(")")) {
                             current_index++;
                             break;
-                        } else if (new_token.value == "," && !flag) {
+                        } else if (new_token.value.equals(",") && !flag) {
                             flag = true;
                             current_index++;
                             continue;
@@ -1215,10 +1299,10 @@ public class Parser {
                 boolean flag = true;
                 while (true) {
                     Token new_token = tokens.get(current_index);
-                    if (new_token.value == ")") {
+                    if (new_token.value.equals(")")) {
                         current_index++;
                         break;
-                    } else if (new_token.value == "," && !flag) {
+                    } else if (new_token.value.equals(",") && !flag) {
                         flag = true;
                         current_index++;
                         continue;
@@ -1242,6 +1326,9 @@ public class Parser {
         return null;
     }
     private List<Parameter> ParseParameter() {
+        if (has_error) {
+            return null;
+        }
         List<Parameter> parameters = new ArrayList<>();
         if (tokens.get(current_index).value.equals("(")) {
             current_index++;
@@ -1328,7 +1415,9 @@ public class Parser {
                         parameters.add(param);
                     }
                 }
+                has_self = false;
             } else {
+                flag = false;
                 Pattern pt = ParsePattern();
                 param.pattern = pt;
                 if (tokens.get(current_index).value.equals(":")) {
@@ -1348,6 +1437,9 @@ public class Parser {
         return parameters;
     }
     private FunctionItem ParseFunctionItem() {
+        if (has_error) {
+            return null;
+        }
         FunctionItem func = new FunctionItem(null, null, null, null, false);
         if (tokens.get(current_index).value.equals("fn")) {
             current_index++;
@@ -1371,7 +1463,7 @@ public class Parser {
         }
         func.parameters = ParseParameter();
         Token arrow = tokens.get(current_index);
-        if (arrow.value == "->") {
+        if (arrow.value.equals("->")) {
             current_index++;
             Type tp = ParseType();
             func.return_type = tp;
@@ -1379,10 +1471,15 @@ public class Parser {
         if (!tokens.get(current_index).value.equals(";")) {
             BlockExpression block = ParseBlockExpression();
             func.body = block;
+        } else {
+            current_index++;
         }
         return func;
     }
     private StructItem ParseStructItem() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("struct")) {
             current_index++;
         } else {
@@ -1404,10 +1501,10 @@ public class Parser {
             List<Parameter> list = new ArrayList<>();
             while (true) {
                 Token new_token = tokens.get(current_index);
-                if (new_token.value == "}") {
+                if (new_token.value.equals("}")) {
                     current_index++;
                     break;
-                } else if (new_token.value == "," && !flag) {
+                } else if (new_token.value.equals(",") && !flag) {
                     flag = true;
                     current_index++;
                     continue;
@@ -1449,6 +1546,9 @@ public class Parser {
         }
     }
     private EnumItem ParseEnumItem() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("enum")) {
             current_index++;
         } else {
@@ -1467,10 +1567,10 @@ public class Parser {
             List<String> list = new ArrayList<>();
             while (true) {
                 Token new_token = tokens.get(current_index);
-                if (new_token.value == "}") {
+                if (new_token.value.equals("}")) {
                     current_index++;
                     break;
-                } else if (new_token.value == "," && !flag) {
+                } else if (new_token.value.equals(",") && !flag) {
                     flag = true;
                     current_index++;
                     continue;
@@ -1500,6 +1600,9 @@ public class Parser {
         }
     }
     private ConstItem ParseConstItem() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("const")) {
             current_index++;
         } else {
@@ -1542,6 +1645,9 @@ public class Parser {
         }
     }
     private TraitItem ParseTraitItem() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("trait")) {
             current_index++;
         } else {
@@ -1576,6 +1682,9 @@ public class Parser {
         return new TraitItem(name, list);
     }
     private ImplItem ParseImplItem() {
+        if (has_error) {
+            return null;
+        }
         if (tokens.get(current_index).value.equals("impl")) {
             current_index++;
         } else {

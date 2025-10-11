@@ -4,7 +4,7 @@ import java.util.*;
 
 abstract class Expression {}
 abstract class Statement {}
-abstract class Item extends Statement{}
+abstract class Item extends Statement {}
 abstract class Type {}
 abstract class Pattern {}
 
@@ -167,8 +167,10 @@ class PathExpression extends Expression {
 }
 class ArrayExpression extends Expression {
     public List<Expression> elements;
-    public ArrayExpression(List<Expression> elements) {
+    public boolean flag;
+    public ArrayExpression(List<Expression> elements, boolean flag) {
         this.elements = elements;
+        flag = false;
     }
 }
 class GroupedExpression extends Expression {
@@ -199,7 +201,7 @@ class FunctionItem extends Item {
     public String name;
     public List<Parameter> parameters;
     public Type return_type;
-    public BlockExpression body;
+    public BlockExpression body = null;
     public boolean is_const;
     public FunctionItem(String name, List<Parameter> params, Type return_type, BlockExpression body, boolean is_const) {
         this.name = name;
@@ -212,6 +214,7 @@ class FunctionItem extends Item {
 class StructItem extends Item {
     public String name;
     public List<Parameter> fields;
+    public List<Scope> impls = new ArrayList<>();
     public StructItem(String name, List<Parameter> fields) {
         this.name = name;
         this.fields = fields;
@@ -639,7 +642,6 @@ public class Parser {
         }
         List<Statement> list = new ArrayList<>();
         while (true && !has_error) {
-            // System.out.println(current_index);
             Token tk = tokens.get(current_index);
             if (tk.value.equals("}")) {
                 current_index++;
@@ -787,6 +789,10 @@ public class Parser {
                 if (tokens.get(current_index).value.equals(":")) {
                     current_index++;
                     Expression exp = ParseExpression();
+                    if (exp == null) {
+                        has_error = true;
+                        return null;
+                    }
                     temp.exp = exp;
                 } else if (tokens.get(current_index).value.equals(",") ||
                             tokens.get(current_index).value.equals("}")) {
@@ -796,6 +802,9 @@ public class Parser {
                     return null;
                 }
                 list.add(temp);
+            } else {
+                has_error = true;
+                return null;
             }
         }
         return new StructExpression(path, sub_path, list);
@@ -902,7 +911,7 @@ public class Parser {
             has_error = true;
             return null;
         }
-        return new ArrayExpression(list);
+        return new ArrayExpression(list, flag_);
     }
     private GroupedExpression ParseGroupedExpression() {
         if (has_error) {
@@ -975,8 +984,18 @@ public class Parser {
             return ParseArrayExpression();
         } else if (tk.value.equals("(")) {
             return ParseGroupedExpression();
-        } else if (tk.value.equals("-") || tk.value.equals("!") || tk.value.equals("~") ||
-                    tk.value.equals("&") || tk.value.equals("*") || tk.value.equals("@")) {
+        } else if ((tk.value.equals("-"))
+                    || tk.value.equals("!") || tk.value.equals("~") ||
+                    tk.value.equals("&") || (tk.value.equals("*"))
+                    || tk.value.equals("@")) {
+            if (tokens.get(current_index - 1).value.equals("+")
+                || tokens.get(current_index - 1).value.equals("-")
+                || tokens.get(current_index - 1).value.equals("*")
+                || tokens.get(current_index - 1).value.equals("/")
+                || tokens.get(current_index - 1).value.equals("%")) {
+                has_error = true;
+                return null;
+            }
             return ParseUnaryExpression();
         } else if (tk.token_type == TokenType.CHAR_LITERAL || 
                     tk.token_type == TokenType.STRING_LITERAL || 
@@ -998,7 +1017,7 @@ public class Parser {
         if (exp == null) {
             return null;
         }
-        while (current_index < tokens.size()) {
+        while (current_index < tokens.size() && !has_error) {
             Token tk = tokens.get(current_index);
             if (tk.value.equals("(")) {
                 exp = ParseCallFuncExpression(exp);
@@ -1049,7 +1068,7 @@ public class Parser {
             if (tokens.get(index).value.equals("}")) {
                 break;
             }
-            if (tokens.get(index).value.equals(";")) {
+            if (tokens.get(index).value.equals(";") || tokens.get(index).value.equals("=")) {
                 flag = true;
                 break;
             }

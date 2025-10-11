@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 
 enum TokenType {
     // Identifiers and literals
-    IDENTIFIER, INTERGER_LITERAL, FLOAT_LITERAL, CHAR_LITERAL, STRING_LITERAL,
+    IDENTIFIER, INTERGER_LITERAL, FLOAT_LITERAL, CHAR_LITERAL, STRING_LITERAL, BOOL_LITERAL,
     // Keywords
     STRICT_KEYWORD, RESERVED_KEYWORD,
     // Operators
@@ -68,7 +68,7 @@ class Index {
  * The class Lexer.
  * TODO
  */
-class Lexer {
+public class Lexer {
     static final private List<String> StrictKeywordList = new ArrayList<>();
     static final private List<String> ReservedKeywordList = new ArrayList<>();
     static final private List<Character> operators = new ArrayList<>();
@@ -1190,6 +1190,9 @@ class Lexer {
         }
         if (StrictKeywordList.contains(str)) {
             res.token_type = TokenType.STRICT_KEYWORD;
+            if (str.equals("true") || str.equals("false")) {
+                res.token_type = TokenType.BOOL_LITERAL;
+            }
         } else if (ReservedKeywordList.contains(str)) {
             res.token_type = TokenType.RESERVED_KEYWORD;
         } else {

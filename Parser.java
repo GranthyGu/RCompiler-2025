@@ -168,9 +168,9 @@ class PathExpression extends Expression {
 class ArrayExpression extends Expression {
     public List<Expression> elements;
     public boolean flag;
-    public ArrayExpression(List<Expression> elements, boolean flag) {
+    public ArrayExpression(List<Expression> elements, boolean flag_) {
         this.elements = elements;
-        flag = false;
+        this.flag = flag_;
     }
 }
 class GroupedExpression extends Expression {
@@ -894,7 +894,7 @@ public class Parser {
             if (tk.value.equals("]")) {
                 current_index++;
                 break;
-            } else if ((tk.value.equals(",") || tk.value.equals(";")) && !flag) {
+            } else if (((tk.value.equals(",") || tk.value.equals(";"))) && !flag) {
                 if (tk.value.equals(";")) {
                     flag_ = true;
                 }
@@ -905,6 +905,9 @@ public class Parser {
                 flag = false;
                 Expression new_exp = ParseExpression();
                 list.add(new_exp);
+            } else {
+                has_error = true;
+                return null;
             }
         }
         if (flag_ && (list.size() != 2 || flag)) {
@@ -981,7 +984,8 @@ public class Parser {
         } else if (tk.value.equals("if")) {
             return ParseIfExpression();
         } else if (tk.value.equals("[")) {
-            return ParseArrayExpression();
+            ArrayExpression arr = ParseArrayExpression();
+            return arr;
         } else if (tk.value.equals("(")) {
             return ParseGroupedExpression();
         } else if ((tk.value.equals("-"))
@@ -1064,11 +1068,25 @@ public class Parser {
         }
         boolean flag = false;
         int index = current_index;
+        int num = 0;
+        boolean flag_ = false;
         while (index < tokens.size()) {
-            if (tokens.get(index).value.equals("}")) {
-                break;
+            if (tokens.get(index).value.equals("{")) {
+                num++;
             }
-            if (tokens.get(index).value.equals(";") || tokens.get(index).value.equals("=")) {
+            if (tokens.get(index).value.equals("}")) {
+                num--;
+                if (num == -1) {
+                    break;
+                }
+            }
+            if (tokens.get(index).value.equals("[")) {
+                flag_ = true;
+            }
+            if (tokens.get(index).value.equals("]")) {
+                flag_ = false;
+            }
+            if (!flag_ && (tokens.get(index).value.equals(";") || tokens.get(index).value.equals("="))) {
                 flag = true;
                 break;
             }

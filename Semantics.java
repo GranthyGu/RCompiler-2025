@@ -16,6 +16,8 @@ enum Kind {
 class Scope {
     public Kind type;
     public Scope parent;
+    public String name;
+    public Expression exp;
     public List<Scope> children = new ArrayList<>();
     public Map<String, Item> typeMap = new HashMap<>();     // Trait, Struct, Enum
     public Map<String, Item> valueMap = new HashMap<>();    // Function, Const
@@ -69,21 +71,24 @@ public class Semantics {
             List<Statement> statements = block.statements;
             scope.returnExpression = block.exp;
             scope.returnType = funcItem.return_type;
-            Parameter first = funcItem.parameters.get(0);
-            boolean flag = false;
-            if (first.isSelf) {
-                flag = true;
-                scope.isSelf = first.isSelf;
-                scope.isMut = first.isMut;
-                scope.isReference = first.isReference;
-            }
-            for (Parameter par : funcItem.parameters) {
-                if (flag) {
-                    flag = false;
-                    continue;
+            scope.name = funcItem.name;
+            if (funcItem.parameters.size() > 0) {
+                Parameter first = funcItem.parameters.get(0);
+                boolean flag = false;
+                if (first.isSelf) {
+                    flag = true;
+                    scope.isSelf = first.isSelf;
+                    scope.isMut = first.isMut;
+                    scope.isReference = first.isReference;
                 }
-                LetStatement let = new LetStatement(par.pattern, par.type, null);
-                scope.statements.add(let);
+                for (Parameter par : funcItem.parameters) {
+                    if (flag) {
+                        flag = false;
+                        continue;
+                    }
+                    LetStatement let = new LetStatement(par.pattern, par.type, null);
+                    scope.statements.add(let);
+                }
             }
             for (Statement sta : statements) {
                 if (sta instanceof FunctionItem) {
@@ -103,6 +108,15 @@ public class Semantics {
                     scope.typeMap.put(name, sta_);
                 } else if (sta instanceof ConstItem) {
                     ConstItem sta_ = (ConstItem)sta;
+                    if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
+                        if (sta_.exp instanceof LiteralExpression) {
+                            int i = (int)(((LiteralExpression)(sta_.exp)).value);
+                            if (i > 2147483647) {
+                                has_error = true;
+                                return false;
+                            }
+                        }
+                    }
                     String name = sta_.name;
                     scope.typeMap.put(name, sta_);
                 } else if (sta instanceof TraitItem) {
@@ -126,6 +140,16 @@ public class Semantics {
                         if (exp instanceof BreakExpression || exp instanceof ContinueExpression) {
                             has_error = true;
                             return false;
+                        }
+                        if (exp instanceof CallFuncExpression) {
+                            CallFuncExpression call = (CallFuncExpression)exp;
+                            if (call.call_ instanceof IdentifierExpression) {
+                                IdentifierExpression id = (IdentifierExpression)(call.call_);
+                                if (id.name.equals("exit") && !funcItem.name.equals("main")) {
+                                    has_error = true;
+                                    return false;
+                                }
+                            }
                         }
                     } else if (sta instanceof LetStatement) {
                         LetStatement let = (LetStatement)sta;
@@ -156,6 +180,15 @@ public class Semantics {
                     }
                 } else if (item_ instanceof ConstItem) {
                     ConstItem sta_ = (ConstItem)item_;
+                    if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
+                        if (sta_.exp instanceof LiteralExpression) {
+                            int i = (int)(((LiteralExpression)(sta_.exp)).value);
+                            if (i > 2147483647) {
+                                has_error = true;
+                                return false;
+                            }
+                        }
+                    }
                     String name = sta_.name;
                     scope.valueMap.put(name, sta_);
                 } else if (item_ instanceof StructItem || item_ instanceof EnumItem || item_ instanceof TraitItem || item_ instanceof ImplItem) {
@@ -165,6 +198,7 @@ public class Semantics {
             }
         } else if (item instanceof ExpressionStatement && isBlockExpression(item)) {
             Expression exp = ((ExpressionStatement)item).expression;
+            scope.exp = exp;
             if (exp instanceof IfExpression) {
                 scope.type = Kind.IFEXP;
                 IfExpression exp_ = (IfExpression)exp;
@@ -189,6 +223,15 @@ public class Semantics {
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ConstItem) {
                         ConstItem sta_ = (ConstItem)sta;
+                        if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
+                            if (sta_.exp instanceof LiteralExpression) {
+                                int i = (int)(((LiteralExpression)(sta_.exp)).value);
+                                if (i > 2147483647) {
+                                    has_error = true;
+                                    return false;
+                                }
+                            }
+                        }
                         String name = sta_.name;
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ExpressionStatement && isBlockExpression(sta)) {
@@ -200,9 +243,19 @@ public class Semantics {
                     } else {
                         if (sta instanceof ExpressionStatement) {
                             Expression _exp_ = ((ExpressionStatement)sta).expression;
-                            if (_exp_ instanceof BreakExpression || _exp_ instanceof ContinueExpression) {
+                            if ((_exp_ instanceof BreakExpression || _exp_ instanceof ContinueExpression) && parent.type != Kind.LOOPEXP && parent.type != Kind.WHILEEXP) {
                                 has_error = true;
                                 return false;
+                            }
+                            if (_exp_ instanceof CallFuncExpression) {
+                                CallFuncExpression call = (CallFuncExpression)_exp_;
+                                if (call.call_ instanceof IdentifierExpression) {
+                                    IdentifierExpression id = (IdentifierExpression)(call.call_);
+                                    if (id.name.equals("exit")) {
+                                        has_error = true;
+                                        return false;
+                                    }
+                                }
                             }
                         } else if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
@@ -219,9 +272,6 @@ public class Semantics {
                 if (exp_.else_branch instanceof IfExpression || exp_.else_branch instanceof BlockExpression) {
                     ExpressionStatement sta = new ExpressionStatement(exp_.else_branch);
                     return scanScope(sta, parent);
-                } else if (!exp_.equals(null)) {
-                    has_error = true;
-                    return false;
                 }
                 return true;
             } else if (exp instanceof LoopExpression) {
@@ -248,6 +298,15 @@ public class Semantics {
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ConstItem) {
                         ConstItem sta_ = (ConstItem)sta;
+                        if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
+                            if (sta_.exp instanceof LiteralExpression) {
+                                int i = (int)(((LiteralExpression)(sta_.exp)).value);
+                                if (i > 2147483647) {
+                                    has_error = true;
+                                    return false;
+                                }
+                            }
+                        }
                         String name = sta_.name;
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ExpressionStatement && isBlockExpression(sta)) {
@@ -257,6 +316,19 @@ public class Semantics {
                             return false;
                         }
                     } else {
+                        if (sta instanceof ExpressionStatement) {
+                            Expression _exp_ = ((ExpressionStatement)sta).expression;
+                            if (_exp_ instanceof CallFuncExpression) {
+                                CallFuncExpression call = (CallFuncExpression)_exp_;
+                                if (call.call_ instanceof IdentifierExpression) {
+                                    IdentifierExpression id = (IdentifierExpression)(call.call_);
+                                    if (id.name.equals("exit")) {
+                                        has_error = true;
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
                         if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
                             if (isBlockExpression(new ExpressionStatement(let.initializer))) {
@@ -294,6 +366,15 @@ public class Semantics {
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ConstItem) {
                         ConstItem sta_ = (ConstItem)sta;
+                        if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
+                            if (sta_.exp instanceof LiteralExpression) {
+                                int i = (int)(((LiteralExpression)(sta_.exp)).value);
+                                if (i > 2147483647) {
+                                    has_error = true;
+                                    return false;
+                                }
+                            }
+                        }
                         String name = sta_.name;
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ExpressionStatement && isBlockExpression(sta)) {
@@ -303,6 +384,19 @@ public class Semantics {
                             return false;
                         }
                     } else {
+                        if (sta instanceof ExpressionStatement) {
+                            Expression _exp_ = ((ExpressionStatement)sta).expression;
+                            if (_exp_ instanceof CallFuncExpression) {
+                                CallFuncExpression call = (CallFuncExpression)_exp_;
+                                if (call.call_ instanceof IdentifierExpression) {
+                                    IdentifierExpression id = (IdentifierExpression)(call.call_);
+                                    if (id.name.equals("exit")) {
+                                        has_error = true;
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
                         if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
                             if (isBlockExpression(new ExpressionStatement(let.initializer))) {
@@ -340,6 +434,15 @@ public class Semantics {
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ConstItem) {
                         ConstItem sta_ = (ConstItem)sta;
+                        if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
+                            if (sta_.exp instanceof LiteralExpression) {
+                                int i = (int)(((LiteralExpression)(sta_.exp)).value);
+                                if (i > 2147483647) {
+                                    has_error = true;
+                                    return false;
+                                }
+                            }
+                        }
                         String name = sta_.name;
                         scope.typeMap.put(name, sta_);
                     } else if (sta instanceof ExpressionStatement && isBlockExpression(sta)) {
@@ -354,6 +457,16 @@ public class Semantics {
                             if (_exp_ instanceof BreakExpression || _exp_ instanceof ContinueExpression) {
                                 has_error = true;
                                 return false;
+                            }
+                            if (_exp_ instanceof CallFuncExpression) {
+                                CallFuncExpression call = (CallFuncExpression)_exp_;
+                                if (call.call_ instanceof IdentifierExpression) {
+                                    IdentifierExpression id = (IdentifierExpression)(call.call_);
+                                    if (id.name.equals("exit")) {
+                                        has_error = true;
+                                        return false;
+                                    }
+                                }
                             }
                         } else if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
@@ -392,6 +505,15 @@ public class Semantics {
                 root.typeMap.put(name, sta_);
             } else if (item_ instanceof ConstItem) {
                 ConstItem sta_ = (ConstItem)item_;
+                if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
+                    if (sta_.exp instanceof LiteralExpression) {
+                        int i = (int)(((LiteralExpression)(sta_.exp)).value);
+                        if (i > 2147483647) {
+                            has_error = true;
+                            return false;
+                        }
+                    }
+                }
                 String name = sta_.name;
                 root.valueMap.put(name, sta_);
             } else if (item_ instanceof TraitItem) {
@@ -421,7 +543,7 @@ public class Semantics {
             return hasType(scope, ((ArrayType)type).type);
         } else if (type instanceof ReferenceType) {
             return hasType(scope, ((ReferenceType)type).type);
-        } else {
+        } else if (type instanceof TypePath) {
             String name = ((TypePath)type).name;
             if (name.equals("self") || name.equals("Self")) {
                 has_error = true;
@@ -438,6 +560,9 @@ public class Semantics {
                 }
                 return hasType(scope.parent, type);
             }
+        } else {
+            has_error = true;
+            return false;
         }
     }
     private boolean hasType_(Scope scope, Type type) {
@@ -451,7 +576,7 @@ public class Semantics {
             return hasType(scope, ((ArrayType)type).type);
         } else if (type instanceof ReferenceType) {
             return hasType(scope, ((ReferenceType)type).type);
-        } else {
+        } else if (type instanceof TypePath) {
             String name = ((TypePath)type).name;
             if (name.equals("self")) {
                 has_error = true;
@@ -468,6 +593,9 @@ public class Semantics {
                 }
                 return hasType(scope.parent, type);
             }
+        } else {
+            has_error = true;
+            return false;
         }
     }
     private boolean checkStruct(Scope scope) {
@@ -619,7 +747,7 @@ public class Semantics {
             if (temp instanceof FunctionItem) {
                 FunctionItem fun = (FunctionItem)temp;
                 Type type = fun.return_type;
-                if (!hasType_(scope, type)) {
+                if (type != null && !hasType_(scope, type)) {
                     return false;
                 }
                 List<Parameter> parameters = fun.parameters;
@@ -657,7 +785,7 @@ public class Semantics {
             if (temp instanceof FunctionItem) {
                 FunctionItem fun = (FunctionItem)temp;
                 Type type = fun.return_type;
-                if (!hasType_(root, type)) {
+                if (type != null && !hasType_(root, type)) {
                     return false;
                 }
                 List<Parameter> parameters = fun.parameters;
@@ -690,6 +818,9 @@ public class Semantics {
         return true;
     }
     private Integer expressionValueCheck(Expression exp, Scope scope) {
+        if (exp == null) {
+            return null;
+        }
         if (exp instanceof BinaryExpression) {
             Integer temp = expressionValueCheck(((BinaryExpression)exp).left, scope);
             Integer temp_ = expressionValueCheck(((BinaryExpression)exp).right, scope);
@@ -769,6 +900,15 @@ public class Semantics {
         if (type1 instanceof TypePath && type2 instanceof TypePath) {
             TypePath type1_ = (TypePath)type1;
             TypePath type2_ = (TypePath)type2;
+            if (type1_.name.equals("114514")) {
+                return type2_.name.equals("i32") || type2_.name.equals("u32") 
+                        || type2_.name.equals("isize") || type2_.name.equals("usize")
+                        || type2_.name.equals("114514");
+            } else if (type2_.name.equals("114514")) {
+                return type1_.name.equals("i32") || type1_.name.equals("u32") 
+                        || type1_.name.equals("isize") || type1_.name.equals("usize")
+                        || type1_.name.equals("114514");
+            }
             return type1_.name.equals(type2_.name);
         } else if (type1 instanceof ReferenceType && type2 instanceof ReferenceType) {
             ReferenceType type1_ = (ReferenceType)type1;
@@ -779,7 +919,7 @@ public class Semantics {
             ArrayType type2_ = (ArrayType)type2;
             Integer i1 = expressionValueCheck(type1_.exp, scope);
             Integer i2 = expressionValueCheck(type2_.exp, scope);
-            return sameType(type1_.type, type2_.type, scope) && (i1 == i2);  // HAVE SOME RISK!
+            return sameType(type1_.type, type2_.type, scope) && ((i1 == i2) || (i1 == null) || (i2 == null));  // HAVE SOME RISK!
         } else if (type1 instanceof UnitType && type2 instanceof UnitType) {
             return true;
         } else {
@@ -792,19 +932,28 @@ public class Semantics {
         }
         if (exp instanceof BinaryExpression) {
             BinaryExpression binary = (BinaryExpression)exp;
-            if (binary.operator.equals("==") || binary.operator.equals("!=")) {
-                // TODO CHECK TYPE
+            if (binary.operator.equals("as")) {
+                return sameType(binary.type, type, scope);
+            }
+            if (binary.operator.equals("==") || binary.operator.equals("!=")
+                || binary.operator.equals("<") || binary.operator.equals(">")
+                || binary.operator.equals("<=") || binary.operator.equals(">=")) {
                 if (type instanceof TypePath) {
                     String t = ((TypePath)type).name;
                     if (!t.equals("bool")) {
                         has_error = true;
                         return false;
+                    } else {
+                        boolean flag = sameType(getType(scope, binary.left), getType(scope, binary.right), scope);
+                        if (!flag) {
+                            has_error = true;
+                        }
+                        return flag;
                     }
                 } else {
                     has_error = true;
                     return false;
                 }
-                return true;
             }
             boolean flag = expressionTypeCheck(binary.left, type, scope) && expressionTypeCheck(binary.right, type, scope);
             if (!flag) {
@@ -813,6 +962,17 @@ public class Semantics {
             return flag;
         } else if (exp instanceof UnaryExpression) {
             UnaryExpression unary = (UnaryExpression)exp;
+            if (unary.operator.equals("&")) {
+                if (type instanceof ReferenceType) {
+                    Type temp = ((ReferenceType)type).type;
+                    return expressionTypeCheck(unary.operand, temp, scope);
+                } else {
+                    has_error = true;
+                    return false;
+                }
+            } else if (unary.operator.equals("*")) {
+                return expressionTypeCheck(unary.operand, new ReferenceType(true, type), scope);
+            }
             boolean flag = expressionTypeCheck(unary.operand, type, scope);
             if (!flag) {
                 has_error = true;
@@ -899,14 +1059,25 @@ public class Semantics {
         } else if (exp instanceof ArrIndexExpression) {
             ArrIndexExpression arr = (ArrIndexExpression)exp;
             Boolean flag = expressionTypeCheck(arr.object, new ArrayType(type, null), scope);
-            // TODO: CHECK the index
-            return flag;
+            boolean flag_ = expressionTypeCheck(arr.index, new TypePath("usize"), scope);
+            return flag && flag_;
         } else if (exp instanceof FieldExpression) {
             FieldExpression field = (FieldExpression)exp;
-            // TODO
+            Expression exp_ = field.object;
+            String subname = field.member;
+            String name = null;
+            if (exp_ instanceof IdentifierExpression) {
+                name = ((IdentifierExpression)exp_).name;
+            }
+            for (Statement sta : scope.statements) {
+                if (sta instanceof LetStatement) {
+                    LetStatement let = (LetStatement)sta;
+                    // TODO
+                }
+            }
         } else if (exp instanceof BlockExpression) {
             BlockExpression block = (BlockExpression)exp;
-            return expressionTypeCheck(block.exp, type, scope);
+            return expressionTypeCheck(block.exp, type, getChild(scope, exp));
             // RISKY!! NEED TO CHECK!!! RETURN EXPRESSION
         } else if (exp instanceof BreakExpression) {
             BreakExpression break_ = (BreakExpression)exp;
@@ -916,11 +1087,11 @@ public class Semantics {
             return expressionTypeCheck(return_.value, type, scope);
         } else if (exp instanceof LoopExpression) {
             LoopExpression loop = (LoopExpression)exp;
-            return expressionTypeCheck(loop.value, type, scope);
+            return expressionTypeCheck(loop.value, type, getChild(scope, exp));
         } else if (exp instanceof WhileExpression) {
             WhileExpression while_ = (WhileExpression)exp;
             TypePath boolean_ = new TypePath("bool");
-            return expressionTypeCheck(while_.condition, boolean_, scope) && expressionTypeCheck(while_.body, type, scope);
+            return expressionTypeCheck(while_.condition, boolean_, scope) && expressionTypeCheck(while_.body, type, getChild(scope, exp));
         } else if (exp instanceof StructExpression) {
             StructExpression struct_ = (StructExpression)exp;
             String name = struct_.name;
@@ -939,8 +1110,12 @@ public class Semantics {
                             has_error = true;
                             return false;
                         }
-                        expressionTypeCheck(field.exp, par.type, scope);
+                        if (!expressionTypeCheck(field.exp, par.type, scope)) {
+                            has_error = true;
+                            return false;
+                        }
                     }
+                    return true;
                 }
             }
             if (scope.parent != null) {
@@ -952,8 +1127,8 @@ public class Semantics {
         } else if (exp instanceof IfExpression) {
             IfExpression if_ = (IfExpression)exp;
             TypePath boolean_ = new TypePath("bool");
-            boolean flag = expressionTypeCheck(if_.condition, boolean_, scope) && expressionTypeCheck(if_.then_branch, type, scope)
-                           && expressionTypeCheck(if_.then_branch, type, scope);
+            boolean flag = expressionTypeCheck(if_.condition, boolean_, scope) && expressionTypeCheck(if_.then_branch, type, getChild(scope, exp))
+                           && expressionTypeCheck(if_.else_branch, type, getChild(scope, if_.else_branch));
             return flag;
         } else if (exp instanceof ArrayExpression) {
             ArrayExpression array = (ArrayExpression)exp;
@@ -962,15 +1137,26 @@ public class Semantics {
                 return false;
             }
             ArrayType type_ = (ArrayType)type;
-            for (Expression expression : array.elements) {
-                if (!expressionTypeCheck(expression, type_.type, scope)) {
+            if (!array.flag) {
+                for (Expression expression : array.elements) {
+                    if (!expressionTypeCheck(expression, type_.type, scope)) {
+                        has_error = true;
+                        return false;
+                    }
+                }
+                if (array.elements.size() != expressionValueCheck(type_.exp, scope)) {
                     has_error = true;
                     return false;
                 }
-            }
-            if (array.elements.size() != expressionValueCheck(type_.exp, scope)) {
-                has_error = true;
-                return false;
+            } else {
+                if (!expressionTypeCheck(array.elements.get(0), type_.type, scope)) {
+                    has_error = true;
+                    return false;
+                }
+                if (expressionValueCheck(type_.exp, scope) != expressionValueCheck(array.elements.get(1), scope)) {
+                    has_error = true;
+                    return false;
+                }
             }
         } else if (exp instanceof GroupedExpression) {
             GroupedExpression group = (GroupedExpression)exp;
@@ -981,10 +1167,25 @@ public class Semantics {
         }
         return true;
     }
+    private Scope getChild(Scope scope, Expression exp) {
+        for (Scope child : scope.children) {
+            if (child.exp != null && child.exp == exp) {
+                return child;
+            }
+        }
+        return scope;
+    }
     private boolean isMutVariable(Expression exp, Scope scope) {
         if (exp instanceof IdentifierExpression) {
             IdentifierExpression id = (IdentifierExpression)exp;
             String name = id.name;
+            if (name.equals("self")) {
+                Scope target = scope;
+                while (target.type != Kind.FUNCTION) {
+                    target = target.parent;
+                }
+                return target.isMut;
+            }
             for (Statement sta : scope.statements) {
                 if (sta instanceof LetStatement) {
                     Pattern pattern = ((LetStatement)sta).pattern;
@@ -1019,7 +1220,12 @@ public class Semantics {
     }
     private void checkStatements(Scope scope) {
         List<Statement> statements = scope.statements;
+        int i = 0;
         for (Statement sta : statements) {
+            if (has_error) {
+                return;
+            }
+            System.out.println(i++);
             if (sta instanceof LetStatement) {
                 LetStatement let = (LetStatement)sta;
                 if (!hasType(scope, let.type) || !expressionTypeCheck(let.initializer, let.type, scope)) {
@@ -1042,6 +1248,9 @@ public class Semantics {
         }
         for (Scope child : scope.children) {
             checkStatements(child);
+            if (has_error) {
+                return;
+            }
         }
     }
     private boolean typeExistCheck(Scope scope) {
@@ -1060,16 +1269,26 @@ public class Semantics {
                 }
             } else {
                 FunctionItem fun = (FunctionItem)(entry.getValue());
-                if (!hasType(scope, fun.return_type)) {
+                if (fun.return_type != null && !hasType(scope, fun.return_type)) {
                     has_error = true;
                     return false;
                 }
-                if (!expressionTypeCheck(fun.body, fun.return_type, scope)) {
+                Scope child = null;
+                for (Scope scope_ : scope.children) {
+                    if (scope_.name != null && scope_.name.equals(fun.name)) {
+                        child = scope_;
+                        break;
+                    }
+                }
+                if (fun.return_type != null && !expressionTypeCheck(fun.body, fun.return_type, child)) {
                     has_error = true;
                     return false;
                 }
                 for (Parameter par : fun.parameters) {
                     Type type = par.type;
+                    if (type == null) {
+                        continue;
+                    }
                     if (!hasType(scope, type)) {
                         has_error = true;
                         return false;
@@ -1079,15 +1298,363 @@ public class Semantics {
         }
         return true;
     }
-    private boolean firstCheckScope() {
-        buildScope();
-        // 1. Traverse the scope tree and check the type of values in structs.
-        // 2. Check if the position is legal for Trait and Impl.
-        // 3. Check the types of parameters of the functions in Trait and Impl.
-        if (has_error || !typeExistCheck(root) || !checkStruct(root) || !checkTrait(root) || !checkImpl(root)) {
+    private boolean checkExit() {
+        FunctionItem main = null;
+        for (Map.Entry<String, Item> entry : root.valueMap.entrySet()) {
+            if (entry.getValue() instanceof FunctionItem) {
+                FunctionItem fun = (FunctionItem)(entry.getValue());
+                if (fun.name.equals("main")) {
+                    main = fun;
+                }
+            }
+        }
+        if (main == null) {
+            has_error = true;
             return false;
         }
-        checkStatements(root);
+        if (main.return_type != null) {
+            has_error = true;
+            return false;
+        }
+        BlockExpression block = main.body;
+        if (block.exp != null) {
+            has_error = true;
+            return false;
+        }
+        Statement sta = block.statements.get(block.statements.size() - 1);
+        if (sta instanceof ExpressionStatement) {
+            Expression exp = ((ExpressionStatement)sta).expression;
+            if (exp instanceof CallFuncExpression) {
+                CallFuncExpression call = (CallFuncExpression)exp;
+                if (!(call.call_ instanceof IdentifierExpression) || call.arguments.size() != 1
+                    || !(call.arguments.get(0) instanceof LiteralExpression)) {
+                    has_error = true;
+                    return false;
+                }
+                IdentifierExpression id = (IdentifierExpression)(call.call_);
+                if (!id.name.equals("exit")) {
+                    has_error = true;
+                    return false;
+                }
+                LiteralExpression literal = (LiteralExpression)(call.arguments.get(0));
+                if (literal.literal_type != TokenType.INTERGER_LITERAL) {
+                    has_error = true;
+                    return false;
+                }
+            } else {
+                has_error = true;
+                return false;
+            }
+        } else {
+            has_error = true;
+            return false;
+        }
         return true;
+    }
+    private boolean checkFunctionNames() {
+        List<String> name = new ArrayList<>();
+        for (Map.Entry<String, Item> entry : root.valueMap.entrySet()) {
+            if (entry.getValue() instanceof FunctionItem) {
+                FunctionItem fun = (FunctionItem)(entry.getValue());
+                String name_ = fun.name;
+                if (name.contains(name_)) {
+                    has_error = true;
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    private Type getType(Scope scope, Expression exp) {
+        if (exp == null || scope == null) {
+            return null;
+        }
+        if (exp instanceof BinaryExpression) {
+            BinaryExpression binary = (BinaryExpression)exp;
+            Type type1 = getType(scope, binary.left);
+            Type type2 = getType(scope, binary.right);
+            if (!sameType(type1, type2, scope)) {
+                has_error = true;
+                return null;
+            }
+            if (binary.operator.equals("==") || 
+                binary.operator.equals("!=") || 
+                binary.operator.equals(">=") || 
+                binary.operator.equals("<=") || 
+                binary.operator.equals(">") || 
+                binary.operator.equals("<")) {
+                return new TypePath("bool");
+            } else {
+                return type1;
+            }
+        } else if (exp instanceof UnaryExpression) {
+            UnaryExpression unary = (UnaryExpression)exp;
+            Type type = getType(scope, unary.operand);
+            if (unary.operator.equals("&")) {
+                return new ReferenceType(true, type);
+            } else if (unary.operator.equals("!")) {
+                if (type instanceof TypePath) {
+                    TypePath path = (TypePath)type;
+                    if (!path.name.equals("bool")) {
+                        has_error = true;
+                        return null;
+                    }
+                } else {
+                    has_error = true;
+                    return null;
+                }
+                return type;
+            } else if (unary.operator.equals("*")) {
+                if (type instanceof ReferenceType) {
+                    ReferenceType type_ = (ReferenceType)type;
+                    return type_.type;
+                } else {
+                    has_error = true;
+                    return null;
+                }
+            } else {
+                return type;
+            }
+        } else if (exp instanceof LiteralExpression) {
+            LiteralExpression literal = (LiteralExpression)exp;
+            TokenType token_type = literal.literal_type;
+            System.out.println(token_type);
+            if (token_type != TokenType.INTERGER_LITERAL) {
+                return new TypePath("114514");     // HAVE RISK
+            } else if (token_type != TokenType.CHAR_LITERAL) {
+                return new TypePath("char");
+            } else if (token_type != TokenType.STRING_LITERAL) {
+                return new TypePath("String");
+            } else if (token_type != TokenType.BOOL_LITERAL) {
+                return new TypePath("bool");
+            }
+        } else if (exp instanceof IdentifierExpression) {
+            IdentifierExpression iden = (IdentifierExpression)exp;
+            String name = iden.name;
+            for (Statement sta : scope.statements) {
+                if (sta instanceof LetStatement) {
+                    LetStatement let = (LetStatement)sta;
+                    Pattern pattern = let.pattern;
+                    if (pattern instanceof ReferencePattern) {
+                        ReferencePattern ref = (ReferencePattern)pattern;
+                        pattern = ref.subPattern;
+                    }
+                    IdentifierPattern id = (IdentifierPattern)pattern;
+                    if (id.name.equals(name)) {
+                        Type type_ = let.type;
+                        return type_;
+                    }
+                }
+            }
+            // CHECK CONSTS
+            for (Map.Entry<String, Item> entry : scope.valueMap.entrySet()) {
+                if (entry.getValue() instanceof ConstItem && entry.getKey().equals(name)) {
+                    ConstItem const_ = (ConstItem)(entry.getValue());
+                    return const_.type;
+                }
+            }
+            if (scope.parent == null) {
+                has_error = true;
+                return null;
+            } else {
+                return getType(scope.parent, exp);
+            }
+        } else if (exp instanceof CallFuncExpression) {
+            CallFuncExpression call = (CallFuncExpression)exp;
+            if (call.call_ instanceof IdentifierExpression) {
+                IdentifierExpression id = (IdentifierExpression)(call.call_);
+                String name = id.name;
+                for (Map.Entry<String, Item> entry : scope.valueMap.entrySet()) {
+                    if (entry.getValue() instanceof FunctionItem && entry.getKey().equals(name)) {
+                        return ((FunctionItem)(entry.getValue())).return_type;
+                    }
+                }
+                if (scope.parent == null) {
+                    has_error = true;
+                    return null;
+                } else {
+                    return getType(scope.parent, exp);
+                }
+            }
+        } else if (exp instanceof CallMethodExpression) {
+            CallMethodExpression method = (CallMethodExpression)exp;
+            // TODO
+        } else if (exp instanceof ArrIndexExpression) {
+            ArrIndexExpression arr = (ArrIndexExpression)exp;
+            return getType(scope, arr.object);
+        } else if (exp instanceof FieldExpression) {
+            FieldExpression field = (FieldExpression)exp;
+            // TODO
+        } else if (exp instanceof BlockExpression) {
+            BlockExpression block = (BlockExpression)exp;
+            return getType(scope, block.exp);
+            // RISKY!! NEED TO CHECK!!! RETURN EXPRESSION
+        } else if (exp instanceof BreakExpression) {
+            BreakExpression break_ = (BreakExpression)exp;
+            return getType(scope, break_.break_expression);
+        } else if (exp instanceof ReturnExpression) {
+            ReturnExpression return_ = (ReturnExpression)exp;
+            return getType(scope, return_.value);
+        } else if (exp instanceof LoopExpression) {
+            LoopExpression loop = (LoopExpression)exp;
+            return getType(scope, loop.value.exp);
+        } else if (exp instanceof WhileExpression) {
+            WhileExpression while_ = (WhileExpression)exp;
+            return getType(scope, while_.body.exp);
+        } else if (exp instanceof StructExpression) {
+            StructExpression struct_ = (StructExpression)exp;
+            String name = struct_.name;
+            for (Map.Entry<String, Item> entry : scope.typeMap.entrySet()) {
+                if (entry.getValue() instanceof StructItem && entry.getKey().equals(name)) {
+                    return new TypePath(entry.getKey());
+                }
+            }
+            if (scope.parent != null) {
+                return getType(scope.parent, exp);
+            } else {
+                has_error = true;
+                return null;
+            }
+        } else if (exp instanceof IfExpression) {
+            IfExpression if_ = (IfExpression)exp;
+            return getType(scope, if_.then_branch.exp);
+        } else if (exp instanceof ArrayExpression) {
+            ArrayExpression array = (ArrayExpression)exp;
+            Type type = getType(scope, array.elements.get(0));
+            int size = array.elements.size();
+            if (!array.flag) {
+                size = expressionValueCheck(array.elements.get(1), scope);
+            }
+            return new ArrayType(type, new LiteralExpression(size, TokenType.INTERGER_LITERAL));
+        } else if (exp instanceof GroupedExpression) {
+            GroupedExpression group = (GroupedExpression)exp;
+            return getType(scope, group.inner);
+        } else if (exp instanceof UnderscoreExpression) {
+            has_error = true;
+            return null;
+        }
+        return null;
+    }
+    private boolean firstCheckScope() {
+        buildScope();
+        printScopeTree();
+
+        if (has_error) {
+            System.out.println("has_error: true");
+        } else {
+            System.out.println("has_error: false");
+        }
+
+        checkStatements(root);
+    
+        if (has_error) {
+            System.out.println("has_error: true");
+        } else {
+            System.out.println("has_error: false");
+        }
+
+        boolean allPassed = true;
+    
+        System.out.println("=== Semantic Check Results ===");
+    
+        boolean ok1 = checkExit();
+        System.out.println("checkExit(): " + ok1);
+        allPassed &= ok1;
+    
+        boolean ok2 = checkFunctionNames();
+        System.out.println("checkFunctionNames(): " + ok2);
+        allPassed &= ok2;
+    
+        boolean ok3 = typeExistCheck(root);
+        System.out.println("typeExistCheck(): " + ok3);
+        allPassed &= ok3;
+    
+        boolean ok4 = checkStruct(root);
+        System.out.println("checkStruct(): " + ok4);
+        allPassed &= ok4;
+    
+        boolean ok5 = checkTrait(root);
+        System.out.println("checkTrait(): " + ok5);
+        allPassed &= ok5;
+    
+        boolean ok6 = checkImpl(root);
+        System.out.println("checkImpl(): " + ok6);
+        allPassed &= ok6;
+    
+        if (has_error) {
+            System.out.println("has_error: true");
+            allPassed = false;
+        } else {
+            System.out.println("has_error: false");
+        }
+    
+        System.out.println("==============================");
+    
+        return allPassed;
+    }
+    public boolean semanticCheck() {
+        return firstCheckScope();
+    }
+    public void printScopeTree() {
+        System.out.println("===== Scope Tree =====");
+        printScopeRecursive(root, 0);
+        System.out.println("======================");
+    }
+    
+    private void printScopeRecursive(Scope scope, int indent) {
+        if (scope == null) return;
+        String prefix = " ".repeat(indent * 2);
+    
+        System.out.println(prefix + "Scope {");
+        System.out.println(prefix + "  Kind: " + scope.type);
+    
+        if (scope.returnType != null)
+            System.out.println(prefix + "  ReturnType: " + scope.returnType);
+    
+        if (scope.returnExpression != null)
+            System.out.println(prefix + "  ReturnExpression: " + scope.returnExpression);
+    
+        if (scope.traitName != null)
+            System.out.println(prefix + "  TraitName: " + scope.traitName);
+    
+        if (scope.typeStruct != null)
+            System.out.println(prefix + "  ImplType: " + scope.typeStruct);
+    
+        if (scope.traitItem != null)
+            System.out.println(prefix + "  TraitItem: " + scope.traitItem.name);
+    
+        if (scope.isSelf || scope.isMut || scope.isReference)
+            System.out.println(prefix + String.format("  SelfParam: [isSelf=%b, isMut=%b, isRef=%b]", 
+                scope.isSelf, scope.isMut, scope.isReference));
+    
+        if (!scope.typeMap.isEmpty()) {
+            System.out.println(prefix + "  TypeMap:");
+            for (Map.Entry<String, Item> entry : scope.typeMap.entrySet()) {
+                System.out.println(prefix + "    " + entry.getKey() + " : " + entry.getValue().getClass().getSimpleName());
+            }
+        }
+    
+        if (!scope.valueMap.isEmpty()) {
+            System.out.println(prefix + "  ValueMap:");
+            for (Map.Entry<String, Item> entry : scope.valueMap.entrySet()) {
+                System.out.println(prefix + "    " + entry.getKey() + " : " + entry.getValue().getClass().getSimpleName());
+            }
+        }
+    
+        if (!scope.statements.isEmpty()) {
+            System.out.println(prefix + "  Statements:");
+            for (Statement stmt : scope.statements) {
+                System.out.println(prefix + "    - " + stmt.getClass().getSimpleName());
+            }
+        }
+    
+        if (!scope.children.isEmpty()) {
+            System.out.println(prefix + "  Children:");
+            for (Scope child : scope.children) {
+                printScopeRecursive(child, indent + 2);
+            }
+        }
+    
+        System.out.println(prefix + "}");
     }
 }

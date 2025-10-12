@@ -73,6 +73,13 @@ public class Main {
             
             System.out.println("\n编译完成!");
             
+            Semantics sem = new Semantics(parser);
+            boolean flag = sem.semanticCheck();
+            if (flag) {
+                System.out.println("\n太对了！！！");
+            } else {
+                System.out.println("\n出错了！！！");
+            }
         } catch (Exception e) {
             System.err.println("编译过程中发生异常: " + e.getMessage());
             e.printStackTrace();
@@ -530,6 +537,7 @@ public class Main {
             }
         } else if (exp instanceof ArrayExpression) {
             ArrayExpression arr = (ArrayExpression) exp;
+            System.out.println(arr.flag);
             System.out.println(indent + "元素数量: " + arr.elements.size());
             if (arr.elements.size() > 0) {
                 System.out.println(indent + "元素列表:");

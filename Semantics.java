@@ -118,7 +118,7 @@ public class Semantics {
                         }
                     }
                     String name = sta_.name;
-                    scope.typeMap.put(name, sta_);
+                    scope.valueMap.put(name, sta_);
                 } else if (sta instanceof TraitItem) {
                     TraitItem sta_ = (TraitItem)sta;
                     String name = sta_.name;
@@ -138,8 +138,19 @@ public class Semantics {
                     if (sta instanceof ExpressionStatement) {
                         Expression exp = ((ExpressionStatement)sta).expression;
                         if (exp instanceof BreakExpression || exp instanceof ContinueExpression) {
-                            has_error = true;
-                            return false;
+                            boolean flag = false;
+                            Scope temp = scope;
+                            while (temp != null) {
+                                if (temp.type == Kind.LOOPEXP || temp.type == Kind.WHILEEXP) {
+                                    flag = true;
+                                    break;
+                                }
+                                temp = temp.parent;
+                            }
+                            if (!flag) {
+                                has_error = true;
+                                return false;
+                            }
                         }
                         if (exp instanceof CallFuncExpression) {
                             CallFuncExpression call = (CallFuncExpression)exp;
@@ -243,9 +254,20 @@ public class Semantics {
                     } else {
                         if (sta instanceof ExpressionStatement) {
                             Expression _exp_ = ((ExpressionStatement)sta).expression;
-                            if ((_exp_ instanceof BreakExpression || _exp_ instanceof ContinueExpression) && parent.type != Kind.LOOPEXP && parent.type != Kind.WHILEEXP) {
-                                has_error = true;
-                                return false;
+                            if ((_exp_ instanceof BreakExpression || _exp_ instanceof ContinueExpression)) {
+                                boolean flag = false;
+                                Scope temp = scope;
+                                while (temp != null) {
+                                    if (temp.type == Kind.LOOPEXP || temp.type == Kind.WHILEEXP) {
+                                        flag = true;
+                                        break;
+                                    }
+                                    temp = temp.parent;
+                                }
+                                if (!flag) {
+                                    has_error = true;
+                                    return false;
+                                }
                             }
                             if (_exp_ instanceof CallFuncExpression) {
                                 CallFuncExpression call = (CallFuncExpression)_exp_;
@@ -454,9 +476,20 @@ public class Semantics {
                     } else {
                         if (sta instanceof ExpressionStatement) {
                             Expression _exp_ = ((ExpressionStatement)sta).expression;
-                            if (_exp_ instanceof BreakExpression || _exp_ instanceof ContinueExpression) {
-                                has_error = true;
-                                return false;
+                            if ((_exp_ instanceof BreakExpression || _exp_ instanceof ContinueExpression)) {
+                                boolean flag = false;
+                                Scope temp = scope;
+                                while (temp != null) {
+                                    if (temp.type == Kind.LOOPEXP || temp.type == Kind.WHILEEXP) {
+                                        flag = true;
+                                        break;
+                                    }
+                                    temp = temp.parent;
+                                }
+                                if (!flag) {
+                                    has_error = true;
+                                    return false;
+                                }
                             }
                             if (_exp_ instanceof CallFuncExpression) {
                                 CallFuncExpression call = (CallFuncExpression)_exp_;
@@ -507,6 +540,10 @@ public class Semantics {
                 ConstItem sta_ = (ConstItem)item_;
                 if (sta_.type instanceof TypePath && ((TypePath)(sta_.type)).name.equals("i32")) {
                     if (sta_.exp instanceof LiteralExpression) {
+                        if (((LiteralExpression)(sta_.exp)).literal_type != TokenType.INTERGER_LITERAL) {
+                            has_error = true;
+                            return false;
+                        }
                         int i = (int)(((LiteralExpression)(sta_.exp)).value);
                         if (i > 2147483647) {
                             has_error = true;
@@ -1088,7 +1125,23 @@ public class Semantics {
             }
         } else if (exp instanceof BlockExpression) {
             BlockExpression block = (BlockExpression)exp;
-            return expressionTypeCheck(block.exp, type, getChild(scope, exp));
+            if (block.exp != null) {
+                return expressionTypeCheck(block.exp, type, getChild(scope, exp));
+            } else {
+                if (block.statements.size() == 0) {
+                    return false;
+                }
+                Statement sta = block.statements.get(block.statements.size() - 1);
+                if (sta instanceof ExpressionStatement) {
+                    Expression exp_ = ((ExpressionStatement)sta).expression;
+                    if (exp_ instanceof BreakExpression || exp_ instanceof ReturnExpression || exp_ instanceof IfExpression) {
+                        return expressionTypeCheck(((ExpressionStatement)sta).expression, type, scope);
+                    } else {
+                        has_error = true;
+                        return false;
+                    }
+                }
+            }
             // RISKY!! NEED TO CHECK!!! RETURN EXPRESSION
         } else if (exp instanceof BreakExpression) {
             BreakExpression break_ = (BreakExpression)exp;
@@ -1235,12 +1288,15 @@ public class Semantics {
         } else if (exp instanceof GroupedExpression) {
             GroupedExpression group = (GroupedExpression)exp;
             return isMutVariable(group.inner, scope);
+        } else if (exp instanceof UnaryExpression) {
+            UnaryExpression unary = (UnaryExpression)exp;
+            return isMutVariable(unary.operand, scope);
         } else {
             has_error = true;
             return false;
         }
     }
-    private void checkStatements(Scope scope) {
+    private void  checkStatements(Scope scope) {
         List<Statement> statements = scope.statements;
         for (Statement sta : statements) {
             if (has_error) {
@@ -1289,7 +1345,7 @@ public class Semantics {
                 }
             } else {
                 FunctionItem fun = (FunctionItem)(entry.getValue());
-                if (fun.return_type != null && !hasType(scope, fun.return_type)) {
+                if (fun.return_type != null && !hasType_(scope, fun.return_type)) {
                     has_error = true;
                     return false;
                 }
@@ -1304,6 +1360,17 @@ public class Semantics {
                     has_error = true;
                     return false;
                 }
+                for (Statement sta : child.statements) {
+                    if (sta instanceof ExpressionStatement) {
+                        if (isBlockExpression(sta)) {
+                            Expression exp = ((ExpressionStatement)sta).expression;
+                            if (fun.return_type != null && isReturn(exp) && !expressionTypeCheck(exp, fun.return_type, getChild(child, exp))) {
+                                has_error = true; 
+                                return false;
+                            }
+                        }
+                    }
+                }
                 for (Parameter par : fun.parameters) {
                     Type type = par.type;
                     if (type == null) {
@@ -1317,6 +1384,49 @@ public class Semantics {
             }
         }
         return true;
+    }
+    private boolean isReturn(Expression exp) {
+        if (exp instanceof BlockExpression) {
+            BlockExpression block = (BlockExpression)exp;
+            if (block.exp != null) {
+                return true;
+            } else {
+                if (block.statements.size() == 0) {
+                    return false;
+                }
+                Statement sta = block.statements.get(block.statements.size() - 1);
+                if (sta instanceof ExpressionStatement) {
+                    Expression exp_ = ((ExpressionStatement)sta).expression;
+                    if (exp_ instanceof BreakExpression || exp_ instanceof ReturnExpression) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        } else if (exp instanceof IfExpression) {
+            IfExpression if_ = (IfExpression)exp;
+            boolean flag = isReturn(if_.then_branch);
+            if (if_.else_branch == null) {
+                return flag;
+            }
+            boolean flag_ = isReturn(if_.else_branch);
+            if (flag && flag_) {
+                return true;
+            } else if (!flag && !flag_) {
+                return false;
+            } else {
+                has_error = true;
+                return false;
+            }
+        } else if (exp instanceof LoopExpression) {
+            return isReturn(((LoopExpression)exp).value);
+        } else if (exp instanceof WhileExpression) {
+            return isReturn(((WhileExpression)exp).body);
+        }
+        return false;
     }
     private boolean checkExit() {
         FunctionItem main = null;
@@ -1347,7 +1457,8 @@ public class Semantics {
             if (exp instanceof CallFuncExpression) {
                 CallFuncExpression call = (CallFuncExpression)exp;
                 if (!(call.call_ instanceof IdentifierExpression) || call.arguments.size() != 1
-                    || !(call.arguments.get(0) instanceof LiteralExpression)) {
+                    || (!(call.arguments.get(0) instanceof LiteralExpression) && !(call.arguments.get(0) instanceof UnaryExpression)
+                    && !(call.arguments.get(0) instanceof BinaryExpression))) {
                     has_error = true;
                     return false;
                 }
@@ -1356,7 +1467,12 @@ public class Semantics {
                     has_error = true;
                     return false;
                 }
-                LiteralExpression literal = (LiteralExpression)(call.arguments.get(0));
+                Expression exp_ = call.arguments.get(0);
+                if (exp_ instanceof UnaryExpression) {
+                    UnaryExpression unary = (UnaryExpression)exp_;
+                    exp_ = unary.operand;
+                }
+                LiteralExpression literal = (LiteralExpression)exp_;
                 if (literal.literal_type != TokenType.INTERGER_LITERAL) {
                     has_error = true;
                     return false;
@@ -1500,7 +1616,16 @@ public class Semantics {
             // TODO
         } else if (exp instanceof ArrIndexExpression) {
             ArrIndexExpression arr = (ArrIndexExpression)exp;
-            return getType(scope, arr.object);
+            Type type = getType(scope, arr.object);
+            if (type instanceof ReferenceType) {
+                type = ((ReferenceType)type).type;
+            }
+            if (type instanceof ArrayType) {
+                return ((ArrayType)type).type;
+            } else {
+                has_error = true;
+                return null;
+            }
         } else if (exp instanceof FieldExpression) {
             FieldExpression field = (FieldExpression)exp;
             // TODO

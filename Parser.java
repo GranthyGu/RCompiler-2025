@@ -459,7 +459,7 @@ public class Parser {
             ismut = true;
             current_index++;
         }
-        Expression right = ParseExpression();
+        Expression right = ParseExpression_(11);
         return new UnaryExpression(operator, right, ismut);
     }
     private LiteralExpression ParseLiteralExpression() {

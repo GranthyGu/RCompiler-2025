@@ -244,7 +244,6 @@ public class Lexer {
             !Suffix.equals("u128") && !Suffix.equals("i128") &&
             !Suffix.equals("usize") && !Suffix.equals("isize") &&
             !Suffix.equals("")) {
-            
             res.is_error = true;
             res.error_type = ErrorType.ERROR; // INVALID_SUFFIX
         }
@@ -254,6 +253,11 @@ public class Lexer {
         // Get the true value by the suffix's type.
         switch (Suffix) {
             case "":
+                Long temp_ = Long.parseLong(temp);
+                if (temp_ >= (2147483648L)) {
+                    res.real_value = temp_;
+                    break;
+                }
                 res.real_value = Integer.parseInt(temp);
                 break;
             case "u8":

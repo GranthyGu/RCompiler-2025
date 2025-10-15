@@ -372,7 +372,6 @@ public class Parser {
             case "|=":
             case "<<=":
             case ">>=":
-            case "as":
                 return 1;
             case "||":
                 return 2;
@@ -406,6 +405,8 @@ public class Parser {
             case "/":
             case "%":
                 return 12;
+            case "as":
+                return 13;
             default:
                 return 0;
         }
@@ -642,6 +643,10 @@ public class Parser {
         }
         List<Statement> list = new ArrayList<>();
         while (true && !has_error) {
+            if (current_index > tokens.size()) {
+                has_error = true;
+                return null;
+            }
             Token tk = tokens.get(current_index);
             if (tk.value.equals("}")) {
                 current_index++;
@@ -837,6 +842,10 @@ public class Parser {
             return null;
         }
         BlockExpression block = ParseBlockExpression();
+        if (current_index >= tokens.size()) {
+            has_error = true;
+            return null;
+        }
         if (tokens.get(current_index).value.equals("else")) {
             current_index++;
             Expression exp_ = ParseExpression();
@@ -1069,7 +1078,7 @@ public class Parser {
         boolean flag = false;
         int index = current_index;
         int num = 0;
-        boolean flag_ = false;
+        int num_ = 0;
         while (index < tokens.size()) {
             if (tokens.get(index).value.equals("{")) {
                 num++;
@@ -1081,12 +1090,12 @@ public class Parser {
                 }
             }
             if (tokens.get(index).value.equals("[")) {
-                flag_ = true;
+                num_++;
             }
             if (tokens.get(index).value.equals("]")) {
-                flag_ = false;
+                num_--;
             }
-            if (!flag_ && (tokens.get(index).value.equals(";") || tokens.get(index).value.equals("="))) {
+            if (num_ == 0 && (tokens.get(index).value.equals(";"))) {
                 flag = true;
                 break;
             }
@@ -1133,6 +1142,10 @@ public class Parser {
             return null;
         }
         Expression exp = ParseExpression();
+        if (current_index >= tokens.size()) {
+            has_error = true;
+            return null;
+        }
         if (tokens.get(current_index).value.equals(";")) {
             current_index++;
         } else if (!tokens.get(current_index - 1).value.equals("}")) {

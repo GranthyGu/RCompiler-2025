@@ -971,7 +971,7 @@ public class Semantics {
         }
     }
     private boolean expressionTypeCheck(Expression exp, Type type, Scope scope){
-        if (exp == null || type == null) {
+        if (exp == null || type == null || type instanceof UnitType) {
             return true;
         }
         if (exp instanceof BinaryExpression) {
@@ -1028,6 +1028,9 @@ public class Semantics {
             return flag;
         } else if (exp instanceof LiteralExpression) {
             LiteralExpression literal = (LiteralExpression)exp;
+            if (type instanceof ReferenceType) {
+                type = ((ReferenceType)type).type;
+            }
             if (!(type instanceof TypePath)) {
                 has_error = true;
                 return false;
@@ -1134,7 +1137,7 @@ public class Semantics {
                 Statement sta = block.statements.get(block.statements.size() - 1);
                 if (sta instanceof ExpressionStatement) {
                     Expression exp_ = ((ExpressionStatement)sta).expression;
-                    if (exp_ instanceof BreakExpression || exp_ instanceof ReturnExpression || exp_ instanceof IfExpression) {
+                    if (exp_ instanceof BreakExpression || exp_ instanceof ReturnExpression || exp_ instanceof IfExpression || exp_ instanceof LoopExpression) {
                         return expressionTypeCheck(((ExpressionStatement)sta).expression, type, scope);
                     } else {
                         has_error = true;
@@ -1142,7 +1145,6 @@ public class Semantics {
                     }
                 }
             }
-            // RISKY!! NEED TO CHECK!!! RETURN EXPRESSION
         } else if (exp instanceof BreakExpression) {
             BreakExpression break_ = (BreakExpression)exp;
             return expressionTypeCheck(break_.break_expression, type, scope);
@@ -1211,7 +1213,7 @@ public class Semantics {
                     has_error = true;
                     return false;
                 }
-                if (expressionValueCheck(type_.exp, scope) != expressionValueCheck(array.elements.get(1), scope)) {
+                if (!expressionValueCheck(type_.exp, scope).equals(expressionValueCheck(array.elements.get(1), scope))) {
                     has_error = true;
                     return false;
                 }
@@ -1296,7 +1298,7 @@ public class Semantics {
             return false;
         }
     }
-    private void  checkStatements(Scope scope) {
+    private void checkStatements(Scope scope) {
         List<Statement> statements = scope.statements;
         for (Statement sta : statements) {
             if (has_error) {
@@ -1316,6 +1318,20 @@ public class Semantics {
                     ((BinaryExpression)exp_).operator.equals("*=") || ((BinaryExpression)exp_).operator.equals("/=") || 
                     ((BinaryExpression)exp_).operator.equals("%="))) {
                     if (!isMutVariable(((BinaryExpression)exp_).left, scope)) {
+                        has_error = true;
+                        return;
+                    }
+                    if (!sameType(getType(scope, ((BinaryExpression)exp_).left), getType(scope, ((BinaryExpression)exp_).right), scope)) {
+                        has_error = true;
+                        return;
+                    }
+                } else if (exp_ instanceof IfExpression) {
+                    if (!expressionTypeCheck(((IfExpression)(exp_)).condition, new TypePath("bool"), scope)) {
+                        has_error = true;
+                        return;
+                    }
+                } else if (exp_ instanceof WhileExpression) {
+                    if (!expressionTypeCheck(((WhileExpression)(exp_)).condition, new TypePath("bool"), scope)) {
                         has_error = true;
                         return;
                     }
@@ -1418,7 +1434,6 @@ public class Semantics {
             } else if (!flag && !flag_) {
                 return false;
             } else {
-                has_error = true;
                 return false;
             }
         } else if (exp instanceof LoopExpression) {
@@ -1442,7 +1457,7 @@ public class Semantics {
             has_error = true;
             return false;
         }
-        if (main.return_type != null) {
+        if (main.return_type != null && !(main.return_type instanceof UnitType)) {
             has_error = true;
             return false;
         }
@@ -1507,6 +1522,9 @@ public class Semantics {
         }
         if (exp instanceof BinaryExpression) {
             BinaryExpression binary = (BinaryExpression)exp;
+            if (binary.operator.equals("as")) {
+                return binary.type;
+            }
             Type type1 = getType(scope, binary.left);
             Type type2 = getType(scope, binary.right);
             if (!sameType(type1, type2, scope)) {
@@ -1599,6 +1617,9 @@ public class Semantics {
             if (call.call_ instanceof IdentifierExpression) {
                 IdentifierExpression id = (IdentifierExpression)(call.call_);
                 String name = id.name;
+                if (name.equals("getInt")) {
+                    return new TypePath("i32");
+                }
                 for (Map.Entry<String, Item> entry : scope.valueMap.entrySet()) {
                     if (entry.getValue() instanceof FunctionItem && entry.getKey().equals(name)) {
                         return ((FunctionItem)(entry.getValue())).return_type;
@@ -1610,10 +1631,82 @@ public class Semantics {
                 } else {
                     return getType(scope.parent, exp);
                 }
+            } else if (call.call_ instanceof PathExpression) {
+                PathExpression path = ((PathExpression)(call.call_));
+                StructItem struct_ = null;
+                String type_name = path.Path;
+                Scope temp = scope;
+                boolean flag = false;
+                while (temp != null) {
+                    for (Map.Entry<String, Item> entry : temp.typeMap.entrySet()) {
+                        if (entry.getValue() instanceof StructItem && entry.getKey().equals(type_name)) {
+                            struct_ = (StructItem)(entry.getValue());
+                            flag = true;
+                            break;
+                        }
+                    }
+                    if (flag) {
+                        break;
+                    }
+                    temp = temp.parent;
+                }
+                if (struct_ == null) {
+                    has_error = true;
+                    return null;
+                }
+                for (Scope impl : struct_.impls) {
+                    for (Map.Entry<String, Item> entry : impl.valueMap.entrySet()) {
+                        if (entry.getValue() instanceof FunctionItem && entry.getKey().equals(path.subPath)) {
+                            return ((FunctionItem)(entry.getValue())).return_type;
+                        }
+                    }
+                }
+                has_error = true;
+                return null;
             }
         } else if (exp instanceof CallMethodExpression) {
             CallMethodExpression method = (CallMethodExpression)exp;
-            // TODO
+            Expression object = method.call_;
+            String name = method.method_name;
+            if (object instanceof IdentifierExpression) {
+                String ob = ((IdentifierExpression)object).name;
+                if (ob.equals("self")) {
+                    boolean flag = false;
+                    Scope temp = scope;
+                    while (temp != null && temp.type != Kind.IMPL) {
+                        temp = temp.parent;
+                        if (temp.type == Kind.IMPL) {
+                            flag = true;
+                            break;
+                        }
+                    }
+                    if (!flag) {
+                        has_error = true;
+                        return null;
+                    }
+                    Scope parent = temp.parent;
+                    Type type = temp.typeStruct;
+                    if (type instanceof TypePath) {
+                        String type_name = ((TypePath)type).name;
+                        for (Map.Entry<String, Item> entry : parent.typeMap.entrySet()) {
+                            if (entry.getValue() instanceof StructItem && entry.getKey().equals(type_name)) {
+                                StructItem struct_ = ((StructItem)(entry.getValue()));
+                                for (Scope impl : struct_.impls) {
+                                    for (Map.Entry<String, Item> entry_ : impl.valueMap.entrySet()) {
+                                        if (entry_.getKey().equals(name)) {
+                                            return ((FunctionItem)(entry_.getValue())).return_type;
+                                        }
+                                    }
+                                }
+                                has_error = true;
+                                return null;
+                            }
+                        }
+                        has_error = true;
+                        return null;
+                    }
+                }
+            }
         } else if (exp instanceof ArrIndexExpression) {
             ArrIndexExpression arr = (ArrIndexExpression)exp;
             Type type = getType(scope, arr.object);
@@ -1628,11 +1721,81 @@ public class Semantics {
             }
         } else if (exp instanceof FieldExpression) {
             FieldExpression field = (FieldExpression)exp;
-            // TODO
+            Expression object = field.object;
+            String name = field.member;
+            if (object instanceof IdentifierExpression && ((IdentifierExpression)object).name.equals("self")) {
+                boolean flag = false;
+                Scope temp = scope;
+                while (temp != null && temp.type != Kind.IMPL) {
+                    temp = temp.parent;
+                    if (temp.type == Kind.IMPL) {
+                        flag = true;
+                        break;
+                    }
+                }
+                if (!flag) {
+                    has_error = true;
+                    return null;
+                }
+                Scope parent = temp.parent;
+                Type type = temp.typeStruct;
+                if (type instanceof TypePath) {
+                    String type_name = ((TypePath)type).name;
+                    for (Map.Entry<String, Item> entry : parent.typeMap.entrySet()) {
+                        if (entry.getValue() instanceof StructItem && entry.getKey().equals(type_name)) {
+                            StructItem struct_ = ((StructItem)(entry.getValue()));
+                            for (Parameter par : struct_.fields) {
+                                if (par.name.equals(name)) {
+                                    return par.type;
+                                }
+                            }
+                            has_error = true;
+                            return null;
+                        }
+                    }
+                    has_error = true;
+                    return null;
+                }
+            } else if (object instanceof IdentifierExpression || object instanceof ArrIndexExpression ||
+                        object instanceof FieldExpression) {
+                Type type = getType(scope, object);
+                if (type instanceof ReferenceType) {
+                    type = ((ReferenceType)type).type;
+                }
+                if (type instanceof TypePath) {
+                    String type_name = ((TypePath)type).name;
+                    Scope temp = scope;
+                    StructItem struct_ = null;
+                    boolean flag = false;
+                    while (temp != null) {
+                        for (Map.Entry<String, Item> entry : temp.typeMap.entrySet()) {
+                            if (entry.getValue() instanceof StructItem && entry.getKey().equals(type_name)) {
+                                struct_ = (StructItem)(entry.getValue());
+                                flag = true;
+                                break;
+                            }
+                        }
+                        if (flag) {
+                            break;
+                        }
+                        temp = temp.parent;
+                    }
+                    if (struct_ == null) {
+                        has_error = true;
+                        return null;
+                    }
+                    for (Parameter par : struct_.fields) {
+                        if (par.name.equals(name)) {
+                            return par.type;
+                        }
+                    }
+                    has_error = true;
+                    return null;
+                }
+            }
         } else if (exp instanceof BlockExpression) {
             BlockExpression block = (BlockExpression)exp;
             return getType(scope, block.exp);
-            // RISKY!! NEED TO CHECK!!! RETURN EXPRESSION
         } else if (exp instanceof BreakExpression) {
             BreakExpression break_ = (BreakExpression)exp;
             return getType(scope, break_.break_expression);
@@ -1676,12 +1839,20 @@ public class Semantics {
         } else if (exp instanceof UnderscoreExpression) {
             has_error = true;
             return null;
+        } else if (exp instanceof PathExpression) {
+            return new TypePath(((PathExpression)exp).Path);
         }
         return null;
     }
     private boolean firstCheckScope() {
         buildScope();
         printScopeTree();
+
+        boolean allPassed = true;
+
+        boolean ok6 = checkImpl(root);
+        System.out.println("checkImpl(): " + ok6);
+        allPassed &= ok6;
 
         if (has_error) {
             System.out.println("has_error: true");
@@ -1696,8 +1867,6 @@ public class Semantics {
         } else {
             System.out.println("has_error: false");
         }
-
-        boolean allPassed = true;
     
         System.out.println("=== Semantic Check Results ===");
     
@@ -1720,10 +1889,6 @@ public class Semantics {
         boolean ok5 = checkTrait(root);
         System.out.println("checkTrait(): " + ok5);
         allPassed &= ok5;
-    
-        boolean ok6 = checkImpl(root);
-        System.out.println("checkImpl(): " + ok6);
-        allPassed &= ok6;
     
         if (has_error) {
             System.out.println("has_error: true");

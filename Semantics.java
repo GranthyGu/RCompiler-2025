@@ -953,13 +953,13 @@ public class Semantics {
         } else if (type1 instanceof ReferenceType && type2 instanceof ReferenceType) {
             ReferenceType type1_ = (ReferenceType)type1;
             ReferenceType type2_ = (ReferenceType)type2;
-            return (type1_.isMut == type2_.isMut) && (sameType(type1_.type, type2_.type, scope));
+            return (sameType(type1_.type, type2_.type, scope));
         } else if (type1 instanceof ArrayType && type2 instanceof ArrayType) {
             ArrayType type1_ = (ArrayType)type1;
             ArrayType type2_ = (ArrayType)type2;
             Integer i1 = expressionValueCheck(type1_.exp, scope);
             Integer i2 = expressionValueCheck(type2_.exp, scope);
-            return sameType(type1_.type, type2_.type, scope) && ((i1.equals(i2)) || (i1 == null) || (i2 == null));  // HAVE SOME RISK!
+            return sameType(type1_.type, type2_.type, scope) && ((i1 == null) || (i2 == null) || (i1.equals(i2)));  // HAVE SOME RISK!
         } else if (type1 instanceof UnitType && type2 instanceof UnitType) {
             return true;
         } else if (type1 instanceof ArrayType && type2 instanceof ReferenceType) {
@@ -988,7 +988,7 @@ public class Semantics {
                         has_error = true;
                         return false;
                     } else {
-                        boolean flag = sameType(getType(scope, binary.left), getType(scope, binary.right), scope);
+                        boolean flag = sameType(getType(scope, scope, binary.left), getType(scope, scope, binary.right), scope);
                         if (!flag) {
                             has_error = true;
                         }
@@ -1006,6 +1006,18 @@ public class Semantics {
             return flag;
         } else if (exp instanceof UnaryExpression) {
             UnaryExpression unary = (UnaryExpression)exp;
+            if (unary.operator.equals("-") && unary.operand instanceof LiteralExpression 
+                && ((LiteralExpression)(unary.operand)).literal_type == TokenType.INTERGER_LITERAL) {
+                Object ob = ((LiteralExpression)(unary.operand)).value;
+                if (ob instanceof Long && ob.equals(2147483648L) && type instanceof TypePath) {
+                    TypePath path = (TypePath)type;
+                    if (path.name.equals("i32") || path.name.equals("u32")) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            }
             if (unary.operator.equals("&")) {
                 if (type instanceof ReferenceType) {
                     if (unary.isMut != ((ReferenceType)type).isMut) {
@@ -1109,7 +1121,7 @@ public class Semantics {
             }
         } else if (exp instanceof CallFuncExpression) {
             CallFuncExpression call = (CallFuncExpression)exp;
-            return sameType(type, getType(scope, call), scope);
+            return sameType(type, getType(scope, scope, call), scope);
         } else if (exp instanceof CallMethodExpression) {
             CallMethodExpression method = (CallMethodExpression)exp;
             // TODO
@@ -1144,7 +1156,7 @@ public class Semantics {
                 if (sta instanceof ExpressionStatement) {
                     Expression exp_ = ((ExpressionStatement)sta).expression;
                     if (exp_ instanceof BreakExpression || exp_ instanceof ReturnExpression || exp_ instanceof IfExpression || exp_ instanceof LoopExpression) {
-                        boolean flag = expressionTypeCheck(((ExpressionStatement)sta).expression, type, scope);
+                        boolean flag = expressionTypeCheck(((ExpressionStatement)sta).expression, type, getChild(scope, exp));
                         return flag;
                     } else {
                         has_error = true;
@@ -1160,7 +1172,16 @@ public class Semantics {
             return expressionTypeCheck(return_.value, type, scope);
         } else if (exp instanceof LoopExpression) {
             LoopExpression loop = (LoopExpression)exp;
-            return expressionTypeCheck(loop.value, type, getChild(scope, exp));
+            BlockExpression block = loop.value;
+            if (block.exp != null) {
+                return expressionTypeCheck(block.exp, type, getChild(scope, exp));
+            } else {
+                if (block.statements.size() == 0) {
+                    return false;
+                }
+                Expression exp_ = isBreak(block);
+                return expressionTypeCheck(exp_, type, scope);
+            }
         } else if (exp instanceof WhileExpression) {
             WhileExpression while_ = (WhileExpression)exp;
             TypePath boolean_ = new TypePath("bool");
@@ -1328,7 +1349,7 @@ public class Semantics {
                         has_error = true;
                         return;
                     }
-                    if (!sameType(getType(scope, ((BinaryExpression)exp_).left), getType(scope, ((BinaryExpression)exp_).right), scope)) {
+                    if (!sameType(getType(scope, scope, ((BinaryExpression)exp_).left), getType(scope, scope, ((BinaryExpression)exp_).right), scope)) {
                         has_error = true;
                         return;
                     }
@@ -1368,6 +1389,9 @@ public class Semantics {
                 }
             } else {
                 FunctionItem fun = (FunctionItem)(entry.getValue());
+                if (fun.return_type instanceof UnitType) {
+                    fun.return_type = null;
+                }
                 if (fun.return_type != null && !hasType_(scope, fun.return_type)) {
                     has_error = true;
                     return false;
@@ -1480,9 +1504,51 @@ public class Semantics {
         }
         return false;
     }
+    private Expression isBreak(Expression exp) {
+        if (exp instanceof BlockExpression) {
+            BlockExpression block = (BlockExpression)exp;
+            if (block.exp != null) {
+                return block.exp;
+            } else {
+                if (block.statements.size() == 0) {
+                    return null;
+                }
+                Statement sta = block.statements.get(block.statements.size() - 1);
+                if (sta instanceof ExpressionStatement) {
+                    Expression exp_ = ((ExpressionStatement)sta).expression;
+                    if (exp_ instanceof BreakExpression || exp_ instanceof ReturnExpression) {
+                        return exp_;
+                    } else {
+                        return null;
+                    }
+                } else {
+                    return null;
+                }
+            }
+        } else if (exp instanceof IfExpression) {
+            IfExpression if_ = (IfExpression)exp;
+            Expression exp_ = isBreak(if_.then_branch);
+            return exp_;
+        } else if (exp instanceof LoopExpression) {
+            return isBreak(((LoopExpression)exp).value);
+        } else if (exp instanceof WhileExpression) {
+            return isBreak(((WhileExpression)exp).body);
+        }
+        return null;
+    }
     private boolean isSufficientReturn(Expression exp) {
         if (exp instanceof ReturnExpression) {
             return true;
+        }
+        if (exp instanceof LoopExpression) {
+            for (Statement sta : ((LoopExpression)exp).value.statements) {
+                if (sta instanceof ExpressionStatement) {
+                    if (isBreak((((ExpressionStatement)sta).expression)) != null) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
         if (!isReturn(exp)) {
             return false;
@@ -1546,7 +1612,7 @@ public class Semantics {
                             temp = child;
                         }
                     }
-                    Type type = getType(temp, exp_);
+                    Type type = getType(temp, temp, exp_);
                     if (type instanceof TypePath) {
                         TypePath path = (TypePath)type;
                         if (!path.name.equals("i32")) {
@@ -1588,7 +1654,7 @@ public class Semantics {
         }
         return true;
     }
-    private Type getType(Scope scope, Expression exp) {
+    private Type getType(Scope expScope, Scope scope, Expression exp) {
         if (exp == null || scope == null) {
             return null;
         }
@@ -1597,8 +1663,8 @@ public class Semantics {
             if (binary.operator.equals("as")) {
                 return binary.type;
             }
-            Type type1 = getType(scope, binary.left);
-            Type type2 = getType(scope, binary.right);
+            Type type1 = getType(expScope, scope, binary.left);
+            Type type2 = getType(expScope, scope, binary.right);
             if (!sameType(type1, type2, scope)) {
                 has_error = true;
                 return null;
@@ -1615,7 +1681,7 @@ public class Semantics {
             }
         } else if (exp instanceof UnaryExpression) {
             UnaryExpression unary = (UnaryExpression)exp;
-            Type type = getType(scope, unary.operand);
+            Type type = getType(expScope, scope, unary.operand);
             if (unary.operator.equals("&")) {
                 return new ReferenceType(true, type);
             } else if (unary.operator.equals("!")) {
@@ -1685,7 +1751,7 @@ public class Semantics {
                 has_error = true;
                 return null;
             } else {
-                return getType(scope.parent, exp);
+                return getType(expScope, scope.parent, exp);
             }
         } else if (exp instanceof CallFuncExpression) {
             CallFuncExpression call = (CallFuncExpression)exp;
@@ -1701,7 +1767,7 @@ public class Semantics {
                         for (int i = 0; i < fun.parameters.size(); i++) {
                             Parameter par = fun.parameters.get(i);
                             Expression exp_ = call.arguments.get(i);
-                            if (!expressionTypeCheck(exp_, par.type, scope)) {
+                            if (!expressionTypeCheck(exp_, par.type, expScope)) {
                                 has_error = true;
                                 return null;
                             }
@@ -1713,7 +1779,7 @@ public class Semantics {
                     has_error = true;
                     return null;
                 } else {
-                    return getType(scope.parent, exp);
+                    return getType(expScope, scope.parent, exp);
                 }
             } else if (call.call_ instanceof PathExpression) {
                 PathExpression path = ((PathExpression)(call.call_));
@@ -1790,7 +1856,7 @@ public class Semantics {
                         return null;
                     }
                 } else {
-                    Type type = getType(scope, method.call_);
+                    Type type = getType(expScope, scope, method.call_);
                     if (type instanceof TypePath) {
                         String type_name = ((TypePath)type).name;
                         Scope temp = scope;
@@ -1828,7 +1894,7 @@ public class Semantics {
             }
         } else if (exp instanceof ArrIndexExpression) {
             ArrIndexExpression arr = (ArrIndexExpression)exp;
-            Type type = getType(scope, arr.object);
+            Type type = getType(expScope, scope, arr.object);
             if (type instanceof ReferenceType) {
                 type = ((ReferenceType)type).type;
             }
@@ -1877,7 +1943,7 @@ public class Semantics {
                 }
             } else if (object instanceof IdentifierExpression || object instanceof ArrIndexExpression ||
                         object instanceof FieldExpression) {
-                Type type = getType(scope, object);
+                Type type = getType(expScope, scope, object);
                 if (type instanceof ReferenceType) {
                     type = ((ReferenceType)type).type;
                 }
@@ -1914,19 +1980,19 @@ public class Semantics {
             }
         } else if (exp instanceof BlockExpression) {
             BlockExpression block = (BlockExpression)exp;
-            return getType(scope, block.exp);
+            return getType(expScope, scope, block.exp);
         } else if (exp instanceof BreakExpression) {
             BreakExpression break_ = (BreakExpression)exp;
-            return getType(scope, break_.break_expression);
+            return getType(expScope, scope, break_.break_expression);
         } else if (exp instanceof ReturnExpression) {
             ReturnExpression return_ = (ReturnExpression)exp;
-            return getType(scope, return_.value);
+            return getType(expScope, scope, return_.value);
         } else if (exp instanceof LoopExpression) {
             LoopExpression loop = (LoopExpression)exp;
-            return getType(scope, loop.value.exp);
+            return getType(expScope, scope, loop.value.exp);
         } else if (exp instanceof WhileExpression) {
             WhileExpression while_ = (WhileExpression)exp;
-            return getType(scope, while_.body.exp);
+            return getType(expScope, scope, while_.body.exp);
         } else if (exp instanceof StructExpression) {
             StructExpression struct_ = (StructExpression)exp;
             String name = struct_.name;
@@ -1936,23 +2002,23 @@ public class Semantics {
                 }
             }
             if (scope.parent != null) {
-                return getType(scope.parent, exp);
+                return getType(expScope, scope.parent, exp);
             } else {
                 has_error = true;
                 return null;
             }
         } else if (exp instanceof IfExpression) {
             IfExpression if_ = (IfExpression)exp;
-            return getType(scope, if_.then_branch.exp);
+            return getType(expScope, scope, if_.then_branch.exp);
         } else if (exp instanceof ArrayExpression) {
             ArrayExpression array = (ArrayExpression)exp;
-            Type type = getType(scope, array.elements.get(0));
-            Type type_ = getType(scope, array.elements.get(array.elements.size() - 1));
+            Type type = getType(expScope, scope, array.elements.get(0));
+            Type type_ = getType(expScope, scope, array.elements.get(array.elements.size() - 1));
             int size = array.elements.size();
             if (array.flag) {
                 size = expressionValueCheck(array.elements.get(1), scope);
             }
-            if (type instanceof TypePath && type_ instanceof TypePath) {
+            if (!array.flag && type instanceof TypePath && type_ instanceof TypePath) {
                 TypePath type1 = (TypePath)type;
                 TypePath type2 = (TypePath)type_;
                 if (!type1.name.equals(type2.name)) {
@@ -1963,7 +2029,7 @@ public class Semantics {
             return new ArrayType(type, new LiteralExpression(size, TokenType.INTERGER_LITERAL));
         } else if (exp instanceof GroupedExpression) {
             GroupedExpression group = (GroupedExpression)exp;
-            return getType(scope, group.inner);
+            return getType(expScope, scope, group.inner);
         } else if (exp instanceof UnderscoreExpression) {
             has_error = true;
             return null;

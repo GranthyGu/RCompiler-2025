@@ -12,6 +12,9 @@ public class Main {
     public static void main(String[] args) {
         // 默认输入文件名
         String inputFileName = "in.txt";
+        if (args.length > 0) {
+            inputFileName = args[0];
+        }
         
         // 如果命令行提供了文件名，使用命令行参数
         if (args.length > 0) {

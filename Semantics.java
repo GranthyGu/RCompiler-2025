@@ -526,6 +526,14 @@ public class Semantics {
             if (item_ instanceof FunctionItem) {
                 FunctionItem sta_ = (FunctionItem)item_;
                 String name = sta_.name;
+                for (Map.Entry<String, Item> entry : root.valueMap.entrySet()) {
+                    if (entry.getValue() instanceof FunctionItem) {
+                        if (entry.getKey().equals(name)) {
+                            has_error = true;
+                            return false;
+                        }
+                    }
+                }
                 root.valueMap.put(name, sta_);
                 scanScope(sta_, root);
             } else if (item_ instanceof StructItem) {
@@ -1215,8 +1223,25 @@ public class Semantics {
         } else if (exp instanceof IfExpression) {
             IfExpression if_ = (IfExpression)exp;
             TypePath boolean_ = new TypePath("bool");
+            // if (if_.then_branch.statements.get(if_.then_branch.statements.size() - 1) instanceof ExpressionStatement &&
+            //     ((ExpressionStatement)(if_.then_branch.statements.get(if_.then_branch.statements.size() - 1))).expression instanceof ReturnExpression) {
+            //     boolean flag = false;
+            //     Scope temp = scope;
+            //     while (temp != null) {
+            //         if (temp.type == Kind.FUNCTION) {
+            //             flag = true;
+            //             break;
+            //         } else {
+            //             temp = temp.parent;
+            //         }
+            //     }
+            //     if (flag) {
+            //         Type type_ = temp.returnType;
+            //         return expressionTypeCheck(((ExpressionStatement)(if_.then_branch.statements.get(if_.then_branch.statements.size() - 1))).expression, type_, scope);
+            //     }
+            // }
             boolean flag = expressionTypeCheck(if_.condition, boolean_, scope) && expressionTypeCheck(if_.then_branch, type, getChild(scope, exp))
-                           && expressionTypeCheck(if_.else_branch, type, getChild(scope, if_.else_branch));
+                           && expressionTypeCheck(if_.else_branch, type, scope);
             return flag;
         } else if (exp instanceof ArrayExpression) {
             ArrayExpression array = (ArrayExpression)exp;
@@ -1640,20 +1665,6 @@ public class Semantics {
         }
         return true;
     }
-    private boolean checkFunctionNames() {
-        List<String> name = new ArrayList<>();
-        for (Map.Entry<String, Item> entry : root.valueMap.entrySet()) {
-            if (entry.getValue() instanceof FunctionItem) {
-                FunctionItem fun = (FunctionItem)(entry.getValue());
-                String name_ = fun.name;
-                if (name.contains(name_)) {
-                    has_error = true;
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
     private Type getType(Scope expScope, Scope scope, Expression exp) {
         if (exp == null || scope == null) {
             return null;
@@ -1681,6 +1692,13 @@ public class Semantics {
             }
         } else if (exp instanceof UnaryExpression) {
             UnaryExpression unary = (UnaryExpression)exp;
+            if (unary.operator.equals("-") && unary.operand instanceof LiteralExpression 
+                && ((LiteralExpression)(unary.operand)).literal_type == TokenType.INTERGER_LITERAL) {
+                Object ob = ((LiteralExpression)(unary.operand)).value;
+                if (ob instanceof Long && ob.equals(2147483648L)) {
+                    return new TypePath("i32");
+                }
+            }
             Type type = getType(expScope, scope, unary.operand);
             if (unary.operator.equals("&")) {
                 return new ReferenceType(true, type);
@@ -2067,10 +2085,6 @@ public class Semantics {
         boolean ok1 = checkExit();
         System.out.println("checkExit(): " + ok1);
         allPassed &= ok1;
-    
-        boolean ok2 = checkFunctionNames();
-        System.out.println("checkFunctionNames(): " + ok2);
-        allPassed &= ok2;
     
         boolean ok3 = typeExistCheck(root);
         System.out.println("typeExistCheck(): " + ok3);

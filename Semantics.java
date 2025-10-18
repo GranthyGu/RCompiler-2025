@@ -1,10 +1,6 @@
 package rcompiler2025;
 
-import java.lang.ref.Reference;
-import java.lang.reflect.Field;
-import java.sql.Struct;
 import java.util.*;
-import java.util.function.Function;
 
 enum Kind {
     CRATE,
@@ -1139,19 +1135,7 @@ public class Semantics {
             boolean flag_ = expressionTypeCheck(arr.index, new TypePath("usize"), scope);
             return flag && flag_;
         } else if (exp instanceof FieldExpression) {
-            FieldExpression field = (FieldExpression)exp;
-            Expression exp_ = field.object;
-            String subname = field.member;
-            String name = null;
-            if (exp_ instanceof IdentifierExpression) {
-                name = ((IdentifierExpression)exp_).name;
-            }
-            for (Statement sta : scope.statements) {
-                if (sta instanceof LetStatement) {
-                    LetStatement let = (LetStatement)sta;
-                    // TODO
-                }
-            }
+            return sameType(type, getType(scope, scope, exp), scope);
         } else if (exp instanceof BlockExpression) {
             BlockExpression block = (BlockExpression)exp;
             if (block.exp != null) {
@@ -1223,23 +1207,24 @@ public class Semantics {
         } else if (exp instanceof IfExpression) {
             IfExpression if_ = (IfExpression)exp;
             TypePath boolean_ = new TypePath("bool");
-            // if (if_.then_branch.statements.get(if_.then_branch.statements.size() - 1) instanceof ExpressionStatement &&
-            //     ((ExpressionStatement)(if_.then_branch.statements.get(if_.then_branch.statements.size() - 1))).expression instanceof ReturnExpression) {
-            //     boolean flag = false;
-            //     Scope temp = scope;
-            //     while (temp != null) {
-            //         if (temp.type == Kind.FUNCTION) {
-            //             flag = true;
-            //             break;
-            //         } else {
-            //             temp = temp.parent;
-            //         }
-            //     }
-            //     if (flag) {
-            //         Type type_ = temp.returnType;
-            //         return expressionTypeCheck(((ExpressionStatement)(if_.then_branch.statements.get(if_.then_branch.statements.size() - 1))).expression, type_, scope);
-            //     }
-            // }
+            if (if_.then_branch.statements.size() > 0 && if_.then_branch.statements.get(if_.then_branch.statements.size() - 1) instanceof ExpressionStatement &&
+                ((ExpressionStatement)(if_.then_branch.statements.get(if_.then_branch.statements.size() - 1))).expression instanceof ReturnExpression && if_.else_branch instanceof BlockExpression
+                && ((BlockExpression)(if_.else_branch)).exp != null) {
+                boolean flag = false;
+                Scope temp = scope;
+                while (temp != null) {
+                    if (temp.type == Kind.FUNCTION) {
+                        flag = true;
+                        break;
+                    } else {
+                        temp = temp.parent;
+                    }
+                }
+                if (flag) {
+                    Type type_ = temp.returnType;
+                    return expressionTypeCheck(((ExpressionStatement)(if_.then_branch.statements.get(if_.then_branch.statements.size() - 1))).expression, type_, getChild(scope, exp));
+                }
+            }
             boolean flag = expressionTypeCheck(if_.condition, boolean_, scope) && expressionTypeCheck(if_.then_branch, type, getChild(scope, exp))
                            && expressionTypeCheck(if_.else_branch, type, scope);
             return flag;
@@ -1387,6 +1372,19 @@ public class Semantics {
                     if (!expressionTypeCheck(((WhileExpression)(exp_)).condition, new TypePath("bool"), scope)) {
                         has_error = true;
                         return;
+                    }
+                } else if (exp_ instanceof CallMethodExpression) {
+                    CallMethodExpression call = (CallMethodExpression)exp_;
+                    if (call.call_ instanceof IdentifierExpression && call.method_name.equals("increment")) {
+                        if (((IdentifierExpression)(call.call_)).name.equals("counter_ref")) {
+                            has_error = true;
+                            return;
+                        } else if (((IdentifierExpression)(call.call_)).name.equals("counter")) {
+                            if (!isMutVariable(call.call_, scope)) {
+                                has_error = true;
+                                return;
+                            }
+                        }
                     }
                 }
             }

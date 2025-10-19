@@ -1087,6 +1087,9 @@ public class Semantics {
         } else if (exp instanceof IdentifierExpression) {
             IdentifierExpression iden = (IdentifierExpression)exp;
             String name = iden.name;
+            if (name.equals("self")) {
+                return true;
+            }
             for (Statement sta : scope.statements) {
                 if (sta instanceof LetStatement) {
                     LetStatement let = (LetStatement)sta;
@@ -1342,6 +1345,7 @@ public class Semantics {
             if (has_error) {
                 return;
             }
+            // System.out.println(statements.size());
             if (sta instanceof LetStatement) {
                 LetStatement let = (LetStatement)sta;
                 if (!hasType(scope, let.type) || !expressionTypeCheck(let.initializer, let.type, scope)) {
@@ -1499,6 +1503,8 @@ public class Semantics {
                     Expression exp_ = ((ExpressionStatement)sta).expression;
                     if (exp_ instanceof BreakExpression || exp_ instanceof ReturnExpression) {
                         return true;
+                    } else if (exp_ instanceof IfExpression || exp_ instanceof WhileExpression) {
+                        return isReturn(exp_);
                     } else {
                         return false;
                     }
@@ -1581,6 +1587,8 @@ public class Semantics {
             boolean flag = isReturn(if_.then_branch);
             if (if_.else_branch == null) {
                 return false;
+            } else {
+                return flag && isSufficientReturn(if_.else_branch);
             }
         }
         return true;
@@ -1907,6 +1915,20 @@ public class Semantics {
                         return null;
                     }
                 }
+            } else if (object instanceof CallMethodExpression || object instanceof ArrIndexExpression) {
+                Type type = getType(expScope, scope, object);
+                if (type instanceof TypePath) {
+                    StructItem struct_ = findStruct(((TypePath)type).name, scope);
+                    for (Scope impl : struct_.impls) {
+                        for (Map.Entry<String, Item> entry_ : impl.valueMap.entrySet()) {
+                            if (entry_.getKey().equals(name) && entry_.getValue() instanceof FunctionItem) {
+                                return ((FunctionItem)(entry_.getValue())).return_type;
+                            }
+                        }
+                    }
+                    has_error = true;
+                    return null;
+                }
             }
         } else if (exp instanceof ArrIndexExpression) {
             ArrIndexExpression arr = (ArrIndexExpression)exp;
@@ -2057,7 +2079,7 @@ public class Semantics {
     private boolean firstCheckScope() {
         buildScope();
         printScopeTree();
-
+        System.out.println("=== Semantic Check Results ===");
         boolean allPassed = true;
 
         boolean ok6 = checkImpl(root);
@@ -2069,42 +2091,31 @@ public class Semantics {
         } else {
             System.out.println("has_error: false");
         }
-
         checkStatements(root);
-    
         if (has_error) {
             System.out.println("has_error: true");
         } else {
             System.out.println("has_error: false");
         }
-    
-        System.out.println("=== Semantic Check Results ===");
-    
         boolean ok1 = checkExit();
         System.out.println("checkExit(): " + ok1);
         allPassed &= ok1;
-    
         boolean ok3 = typeExistCheck(root);
         System.out.println("typeExistCheck(): " + ok3);
         allPassed &= ok3;
-    
         boolean ok4 = checkStruct(root);
         System.out.println("checkStruct(): " + ok4);
         allPassed &= ok4;
-    
         boolean ok5 = checkTrait(root);
         System.out.println("checkTrait(): " + ok5);
         allPassed &= ok5;
-    
         if (has_error) {
             System.out.println("has_error: true");
             allPassed = false;
         } else {
             System.out.println("has_error: false");
         }
-    
         System.out.println("==============================");
-    
         return allPassed;
     }
     public boolean semanticCheck() {
@@ -2122,6 +2133,7 @@ public class Semantics {
     
         System.out.println(prefix + "Scope {");
         System.out.println(prefix + "  Kind: " + scope.type);
+        System.out.println(scope.name);
     
         if (scope.returnType != null)
             System.out.println(prefix + "  ReturnType: " + scope.returnType);

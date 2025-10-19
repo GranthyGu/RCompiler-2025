@@ -1027,6 +1027,9 @@ public class Parser {
             return null;
         }
         Expression exp = ParseAtomExpression();
+        if (exp instanceof WhileExpression) {
+            return exp;
+        }
         if (exp == null) {
             return null;
         }

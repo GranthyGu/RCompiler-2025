@@ -1,4 +1,4 @@
-package rcompiler2025;
+package rcompiler2025.src;
 
 import java.util.*;
 import java.io.*;
@@ -66,7 +66,6 @@ class Index {
 
 /**
  * The class Lexer.
- * TODO
  */
 public class Lexer {
     static final private List<String> StrictKeywordList = new ArrayList<>();

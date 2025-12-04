@@ -1,6 +1,5 @@
-package rcompiler2025;
+package rcompiler2025.src;
 
-import java.io.*;
 import java.util.*;
 
 /**
@@ -62,8 +61,7 @@ public class Main {
                 }
                 return;
             }
-            
-            System.out.println("语法分析成功!");
+            System.out.println("语法分析成功!!!!");
             
             // 步骤3: 输出结果
             System.out.println("\n=== 编译结果 ===");

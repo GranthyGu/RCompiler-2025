@@ -1,9 +1,11 @@
-package rcompiler2025;
+package rcompiler2025.src;
 
 import java.util.*;
 
 abstract class Expression {}
-abstract class Statement {}
+abstract class Statement {
+    public Scope scope = null;
+}
 abstract class Item extends Statement {}
 abstract class Type {}
 abstract class Pattern {}
@@ -151,10 +153,12 @@ class IfExpression extends Expression {
     public Expression condition;
     public BlockExpression then_branch;
     public Expression else_branch;
+    public ExpressionStatement sta;
     public IfExpression(Expression condition, BlockExpression then_branch, Expression else_branch) {
         this.condition = condition;
         this.then_branch = then_branch;
         this.else_branch = else_branch;
+        this.sta = new ExpressionStatement(else_branch);
     }
 }
 class PathExpression extends Expression {
@@ -190,10 +194,12 @@ class LetStatement extends Statement {
     public Pattern pattern;
     public Type type;
     public Expression initializer;
+    public ExpressionStatement sta;
     public LetStatement(Pattern pt, Type type, Expression init) {
         this.pattern = pt;
         this.type= type;
         this.initializer = init;
+        this.sta = new ExpressionStatement(init);
     }
 }
 
@@ -374,39 +380,39 @@ public class Parser {
             case ">>=":
                 return 1;
             case "||":
-                return 2;
-            case "&&":
                 return 3;
-            case "|":
-                return 4;
-            case "^":
+            case "&&":
                 return 5;
+            case "|":
+                return 7;
+            case "^":
+                return 9;
             case "&":
-                return 6;
+                return 11;
             case "==":
             case "!=":
-                return 7;
+                return 13;
             case "<":
             case "<=":
             case ">":
             case ">=":
-                return 8;
+                return 15;
             case "<<":
             case ">>":
-                return 9;
+                return 17;
             case "..":
             case "..=":
             case "...":
-                return 10;
+                return 19;
             case "+":
             case "-":
-                return 11;
+                return 21;
             case "*":
             case "/":
             case "%":
-                return 12;
+                return 23;
             case "as":
-                return 13;
+                return 25;
             default:
                 return 0;
         }

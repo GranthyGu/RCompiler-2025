@@ -1,6 +1,8 @@
 /bin
-/rcompiler2025
+/rcompiler2025_testcases
+test.rs
 in.txt
 errors.txt
 /semantic-1
 /semantic-2
+/compileResult

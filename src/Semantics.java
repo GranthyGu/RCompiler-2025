@@ -1,4 +1,4 @@
-package rcompiler2025;
+package rcompiler2025.src;
 
 import java.util.*;
 
@@ -19,6 +19,7 @@ class Scope {
     public Map<String, Item> valueMap = new HashMap<>();    // Function, Const
     public List<Statement> statements = new ArrayList<>();
     public Expression returnExpression = null;
+    public Integer scopeIndex = 0;
     public Type returnType = null;      // Only for Function
     public boolean isMut = false;       // Only for the first parameter of Function.
     public boolean isReference = false; // Only for the first parameter of Function.
@@ -42,7 +43,10 @@ public class Semantics {
     public boolean has_error = false;
     private List<String> primitiveTypes = Arrays.asList("i32", "u32", "isize", "usize", "bool", "str", "String", "char");
     private List<TraitItem> traitItems = new ArrayList<>();
+    private Integer scopeIndex = 0;
     public Semantics(Parser parser) {
+        root.scopeIndex = this.scopeIndex;
+        this.scopeIndex++;
         items = parser.program.nodes;
     }
     private boolean isBlockExpression(Statement sta) {
@@ -60,6 +64,9 @@ public class Semantics {
     }
     private boolean scanScope(Statement item, Scope parent) {
         Scope scope = new Scope(null, parent);
+        scope.scopeIndex = this.scopeIndex;
+        this.scopeIndex++;
+        item.scope = scope;
         if (item instanceof FunctionItem) {
             scope.type = Kind.FUNCTION;
             FunctionItem funcItem = (FunctionItem)item;
@@ -160,8 +167,8 @@ public class Semantics {
                         }
                     } else if (sta instanceof LetStatement) {
                         LetStatement let = (LetStatement)sta;
-                        if (isBlockExpression(new ExpressionStatement(let.initializer))) {
-                            if (!scanScope(new ExpressionStatement(let.initializer), scope)) {
+                        if (isBlockExpression(let.sta)) {
+                            if (!scanScope(let.sta, scope)) {
                                 has_error = true;
                                 return false;
                             }
@@ -277,8 +284,8 @@ public class Semantics {
                             }
                         } else if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
-                            if (isBlockExpression(new ExpressionStatement(let.initializer))) {
-                                if (!scanScope(new ExpressionStatement(let.initializer), scope)) {
+                            if (isBlockExpression(let.sta)) {
+                                if (!scanScope(let.sta, scope)) {
                                     has_error = true;
                                     return false;
                                 }
@@ -288,8 +295,7 @@ public class Semantics {
                     }
                 }
                 if (exp_.else_branch instanceof IfExpression || exp_.else_branch instanceof BlockExpression) {
-                    ExpressionStatement sta = new ExpressionStatement(exp_.else_branch);
-                    return scanScope(sta, parent);
+                    return scanScope(exp_.sta, parent);
                 }
                 return true;
             } else if (exp instanceof LoopExpression) {
@@ -349,8 +355,8 @@ public class Semantics {
                         }
                         if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
-                            if (isBlockExpression(new ExpressionStatement(let.initializer))) {
-                                if (!scanScope(new ExpressionStatement(let.initializer), scope)) {
+                            if (isBlockExpression(let.sta)) {
+                                if (!scanScope(let.sta, scope)) {
                                     has_error = true;
                                     return false;
                                 }
@@ -417,8 +423,8 @@ public class Semantics {
                         }
                         if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
-                            if (isBlockExpression(new ExpressionStatement(let.initializer))) {
-                                if (!scanScope(new ExpressionStatement(let.initializer), scope)) {
+                            if (isBlockExpression(let.sta)) {
+                                if (!scanScope(let.sta, scope)) {
                                     has_error = true;
                                     return false;
                                 }
@@ -499,8 +505,8 @@ public class Semantics {
                             }
                         } else if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
-                            if (isBlockExpression(new ExpressionStatement(let.initializer))) {
-                                if (!scanScope(new ExpressionStatement(let.initializer), scope)) {
+                            if (isBlockExpression(let.sta)) {
+                                if (!scanScope(let.sta, scope)) {
                                     has_error = true;
                                     return false;
                                 }
@@ -1130,8 +1136,6 @@ public class Semantics {
             CallFuncExpression call = (CallFuncExpression)exp;
             return sameType(type, getType(scope, scope, call), scope);
         } else if (exp instanceof CallMethodExpression) {
-            CallMethodExpression method = (CallMethodExpression)exp;
-            // TODO
         } else if (exp instanceof ArrIndexExpression) {
             ArrIndexExpression arr = (ArrIndexExpression)exp;
             Boolean flag = expressionTypeCheck(arr.object, new ArrayType(type, null), scope);
@@ -1268,7 +1272,7 @@ public class Semantics {
         }
         return true;
     }
-    private StructItem findStruct(String name, Scope scope) {
+    public StructItem findStruct(String name, Scope scope) {
         for (Map.Entry<String, Item> entry : scope.typeMap.entrySet()) {
             if (entry.getValue() instanceof StructItem && entry.getKey().equals(name)) {
                 return (StructItem)(entry.getValue());
@@ -1671,7 +1675,7 @@ public class Semantics {
         }
         return true;
     }
-    private Type getType(Scope expScope, Scope scope, Expression exp) {
+    public Type getType(Scope expScope, Scope scope, Expression exp) {
         if (exp == null || scope == null) {
             return null;
         }

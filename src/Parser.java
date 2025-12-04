@@ -388,7 +388,7 @@ public class Parser {
             case "^":
                 return 9;
             case "&":
-                return 11;
+                return 13;
             case "==":
             case "!=":
                 return 13;
@@ -466,7 +466,7 @@ public class Parser {
             ismut = true;
             current_index++;
         }
-        Expression right = ParseExpression_(11);
+        Expression right = ParseExpression_(25);
         return new UnaryExpression(operator, right, ismut);
     }
     private LiteralExpression ParseLiteralExpression() {
@@ -1007,11 +1007,11 @@ public class Parser {
                     || tk.value.equals("!") || tk.value.equals("~") ||
                     tk.value.equals("&") || (tk.value.equals("*"))
                     || tk.value.equals("@")) {
-            if (tokens.get(current_index - 1).value.equals("+")
+            if ((tokens.get(current_index - 1).value.equals("+")
                 || tokens.get(current_index - 1).value.equals("-")
                 || tokens.get(current_index - 1).value.equals("*")
                 || tokens.get(current_index - 1).value.equals("/")
-                || tokens.get(current_index - 1).value.equals("%")) {
+                || tokens.get(current_index - 1).value.equals("%")) && tokens.get(current_index + 1).token_type.equals(TokenType.INTERGER_LITERAL) && !(tk.value.equals("-"))) {
                 has_error = true;
                 return null;
             }
@@ -1065,6 +1065,9 @@ public class Parser {
                     tk.value.equals("^=") || tk.value.equals("&=") || tk.value.equals("|=") ||
                     tk.value.equals("<<=") || tk.value.equals(">>=") || tk.value.equals("as")) {
                 int priority_ = GetPriority(tk.value);
+                if (exp instanceof IfExpression && tk.value.equals("*")) {
+                    break;
+                }
                 if (priority_ <= priority) {
                     break;
                 } else {

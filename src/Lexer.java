@@ -152,12 +152,16 @@ public class Lexer {
         String temp = "";
         temp += SrcCode.charAt(index.index);
         boolean is_dec = false;    // To judge decimal.
+        boolean is0b = false;
+        boolean is0x = false;
+        boolean is0o = false;
         if (SrcCode.charAt(index.index) == '0') {
             NextIndex(index);
             Character next_char = SrcCode.charAt(index.index);
             boolean has_digit = false;      // has_digit = true until the first element != '_'.
             if (next_char == 'b') {
                 temp += next_char;
+                is0b = true;
                 NextIndex(index);
                 while (index.index < SrcCode.length() && ((SrcCode.charAt(index.index) - '0' >= 0 &&
                     SrcCode.charAt(index.index) - '0' <= 1) || SrcCode.charAt(index.index) == '_')) {
@@ -171,6 +175,7 @@ public class Lexer {
                 }
             } else if (next_char == 'o') {
                 temp += next_char;
+                is0o = true;
                 NextIndex(index);
                 while (index.index < SrcCode.length() && ((SrcCode.charAt(index.index) - '0' >= 0 &&
                     SrcCode.charAt(index.index) - '0' <= 7) || SrcCode.charAt(index.index) == '_')) {
@@ -184,6 +189,7 @@ public class Lexer {
                 }
             } else if (next_char == 'x') {
                 temp += next_char;
+                is0x = true;
                 NextIndex(index);
                 while (index.index < SrcCode.length() && ((SrcCode.charAt(index.index) - '0' >= 0 &&
                     SrcCode.charAt(index.index) - '0' <= 9) || (SrcCode.charAt(index.index) - 'A' >= 0 &&
@@ -252,6 +258,31 @@ public class Lexer {
         // Get the true value by the suffix's type.
         switch (Suffix) {
             case "":
+                if (is0x) {
+                    Long temp_ = Long.parseLong(temp.substring(2), 16);
+                    if (temp_ >= (2147483648L)) {
+                        res.real_value = temp_;
+                        break;
+                    }
+                    res.real_value = Integer.parseInt(temp.substring(2), 16);
+                    break;
+                } else if (is0o) {
+                    Long temp_ = Long.parseLong(temp.substring(2), 8);
+                    if (temp_ >= (2147483648L)) {
+                        res.real_value = temp_;
+                        break;
+                    }
+                    res.real_value = Integer.parseInt(temp.substring(2), 8);
+                    break;
+                } else if (is0b) {
+                    Long temp_ = Long.parseLong(temp.substring(2), 2);
+                    if (temp_ >= (2147483648L)) {
+                        res.real_value = temp_;
+                        break;
+                    }
+                    res.real_value = Integer.parseInt(temp.substring(2), 2);
+                    break;
+                }
                 Long temp_ = Long.parseLong(temp);
                 if (temp_ >= (2147483648L)) {
                     res.real_value = temp_;
@@ -269,6 +300,11 @@ public class Lexer {
                 break;
             case "u32":
             case "i32":
+                Long temp__ = Long.parseLong(temp);
+                if (temp__ >= (2147483648L)) {
+                    res.real_value = temp__;
+                    break;
+                }
                 res.real_value = Integer.parseInt(temp);
                 break;
             case "u64":
@@ -308,18 +344,7 @@ public class Lexer {
                     if (SrcCode.charAt(index.index) == '=') {
                         temp += SrcCode.charAt(index.index);
                         NextIndex(index);
-                    } else {
-                        temp += SrcCode.charAt(index.index);
-                        NextIndex(index);
-                        res.is_error = true;
-                        res.error_type = ErrorType.ERROR;   // WRONG_OPERATOR
                     }
-                }
-                while (operators.contains(SrcCode.charAt(index.index))) {
-                    temp += SrcCode.charAt(index.index);
-                    NextIndex(index);
-                    res.is_error = true;
-                    res.error_type = ErrorType.ERROR;   // WRONG_OPERATOR
                 }
                 break;
             case '-':
@@ -329,18 +354,7 @@ public class Lexer {
                     if (SrcCode.charAt(index.index) == '=' || SrcCode.charAt(index.index) == '>') {
                         temp += SrcCode.charAt(index.index);
                         NextIndex(index);
-                    } else {
-                        temp += SrcCode.charAt(index.index);
-                        NextIndex(index);
-                        res.is_error = true;
-                        res.error_type = ErrorType.ERROR;   // WRONG_OPERATOR
                     }
-                }
-                while (operators.contains(SrcCode.charAt(index.index))) {
-                    temp += SrcCode.charAt(index.index);
-                    NextIndex(index);
-                    res.is_error = true;
-                    res.error_type = ErrorType.ERROR;   // WRONG_OPERATOR
                 }
                 break;
             case '&':
@@ -350,18 +364,7 @@ public class Lexer {
                     if (SrcCode.charAt(index.index) == '=' || SrcCode.charAt(index.index) == '&') {
                         temp += SrcCode.charAt(index.index);
                         NextIndex(index);
-                    } else {
-                        temp += SrcCode.charAt(index.index);
-                        NextIndex(index);
-                        res.is_error = true;
-                        res.error_type = ErrorType.ERROR;   // WRONG_OPERATOR
-                    }
-                }
-                while (operators.contains(SrcCode.charAt(index.index))) {
-                    temp += SrcCode.charAt(index.index);
-                    NextIndex(index);
-                    res.is_error = true;
-                    res.error_type = ErrorType.ERROR;   // WRONG_OPERATOR
+                    } 
                 }
                 break;
             case '|':

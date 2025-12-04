@@ -299,9 +299,9 @@ class IRGenerator extends IRInstructions {
         if (type instanceof TypePath) {
             TypePath typePath = (TypePath)type;
             String name = typePath.name;
-            if (name.equals("i32") || name.equals("u32")) {
+            if (name.equals("i32")) {
                 return "i32";
-            } else if (name.equals("isize") || name.equals("usize")) {
+            } else if (name.equals("isize") || name.equals("usize") || name.equals("u32")) {
                 return "i64";
             } else if (name.equals("bool")) {
                 return "i1";
@@ -390,6 +390,10 @@ class IRGenerator extends IRInstructions {
     }
     private String targetVariableName(List<IRInstructions> instructions, Expression exp, Scope scope) {
         if (exp instanceof BinaryExpression) {
+            BinaryExpression binary = (BinaryExpression)exp;
+            if (binary.operator.equals("as")) {
+                return targetVariableName(instructions, binary.left, scope);
+            }
             IRInstructions ins = instructions.get(instructions.size() - 1);
             if (ins instanceof BinaryInstruction) {
                 BinaryInstruction bi = (BinaryInstruction)ins;
@@ -794,8 +798,7 @@ class IRGenerator extends IRInstructions {
             String operator = binary.operator.substring(0, binary.operator.length() - 1);
             return getBinaryExpression(new BinaryExpression(binary.left, "=", new BinaryExpression(binary.left, operator, binary.right, null), null), scope);
         } else if (binary.operator.equals("as")) {
-            // TODO: as operator.
-            return null;
+            return getExpressions(binary.left, scope, scope, null, null);
         } else {
             System.err.println("Undefined binary operator: " + binary.operator);
             return null;
@@ -1769,8 +1772,8 @@ public class LLVMProgram {
         }
         return null;
     }
-    public LLVMProgram(Parser parser, Scope root, Semantics semantics) {
-        this.root = root;
+    public LLVMProgram(Parser parser, Semantics semantics) {
+        this.root = semantics.root;
         program = parser.program.nodes;
         this.instructions = new ArrayList<>();
         this.semantics = semantics;

@@ -1065,7 +1065,7 @@ public class Semantics {
                     return false;
                 }
                 if (literal.value instanceof Long) {
-                    if (name.equals("i32") || name.equals("u32")) {
+                    if (name.equals("i32")) {
                         has_error = true;
                         return false;
                     }
@@ -1305,6 +1305,15 @@ public class Semantics {
                 return target.isMut;
             }
             for (Statement sta : scope.statements) {
+                if (sta instanceof ExpressionStatement) {
+                    ExpressionStatement sta_ = (ExpressionStatement)sta;
+                    if (sta_.expression instanceof BinaryExpression) {
+                        BinaryExpression binary = (BinaryExpression)sta_.expression;
+                        if (binary.left == exp) {
+                            break;
+                        }
+                    }
+                }
                 if (sta instanceof LetStatement) {
                     Pattern pattern = ((LetStatement)sta).pattern;
                     while (pattern instanceof ReferencePattern) {
@@ -1349,7 +1358,7 @@ public class Semantics {
             if (has_error) {
                 return;
             }
-            // System.out.println(statements.size());
+            System.out.println(statements.size());
             if (sta instanceof LetStatement) {
                 LetStatement let = (LetStatement)sta;
                 if (!hasType(scope, let.type) || !expressionTypeCheck(let.initializer, let.type, scope)) {
@@ -1686,7 +1695,7 @@ public class Semantics {
             }
             Type type1 = getType(expScope, scope, binary.left);
             Type type2 = getType(expScope, scope, binary.right);
-            if (!sameType(type1, type2, scope)) {
+            if (!sameType(type1, type2, scope) && !(binary.operator.equals("<<") || binary.operator.equals(">>"))) {
                 has_error = true;
                 return null;
             }
@@ -1713,16 +1722,6 @@ public class Semantics {
             if (unary.operator.equals("&")) {
                 return new ReferenceType(true, type);
             } else if (unary.operator.equals("!")) {
-                if (type instanceof TypePath) {
-                    TypePath path = (TypePath)type;
-                    if (!path.name.equals("bool")) {
-                        has_error = true;
-                        return null;
-                    }
-                } else {
-                    has_error = true;
-                    return null;
-                }
                 return type;
             } else if (unary.operator.equals("*")) {
                 if (type instanceof ReferenceType) {

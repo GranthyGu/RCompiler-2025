@@ -62,6 +62,28 @@ public class Semantics {
             return false;
         }
     }
+    private List<IfExpression> getIfinBinary(Expression exp) {
+        List<IfExpression> ifList = new ArrayList<>();
+        if (exp instanceof BinaryExpression) {
+            BinaryExpression binaryExp = (BinaryExpression)exp;
+            List<IfExpression> if1 = getIfinBinary(binaryExp.left);
+            List<IfExpression> if2 = getIfinBinary(binaryExp.right);
+            if (if1 != null) {
+                ifList.addAll(if1);
+            }
+            if (if2 != null) {
+                ifList.addAll(if2);
+            }
+        } else if (exp instanceof IfExpression) {
+            ifList.add((IfExpression)exp);
+        } else if (exp instanceof GroupedExpression) {
+            List<IfExpression> if3 = getIfinBinary(((GroupedExpression)exp).inner);
+            if (if3 != null) {
+                ifList.addAll(if3);
+            }
+        }
+        return ifList;
+    }
     private boolean scanScope(Statement item, Scope parent) {
         Scope scope = new Scope(null, parent);
         scope.scopeIndex = this.scopeIndex;
@@ -163,6 +185,18 @@ public class Semantics {
                                     has_error = true;
                                     return false;
                                 }
+                                for (Expression exp__ : call.arguments) {
+                                    if (exp__ instanceof IfExpression) {
+                                        IfExpression ifExp = (IfExpression)exp__;
+                                        scanScope(ifExp.thisSta, parent);
+                                    }
+                                }
+                            }
+                        }
+                        if (exp instanceof BinaryExpression) {
+                            List<IfExpression> ifList = getIfinBinary(exp);
+                            for (IfExpression ifExp : ifList) {
+                                scanScope(ifExp.thisSta, scope);
                             }
                         }
                     } else if (sta instanceof LetStatement) {
@@ -172,9 +206,26 @@ public class Semantics {
                                 has_error = true;
                                 return false;
                             }
+                        } else {
+                            Expression exp = ((ExpressionStatement)(let.sta)).expression;
+                            if (exp instanceof BinaryExpression) {
+                                List<IfExpression> ifList = getIfinBinary(exp);
+                                for (IfExpression ifExp : ifList) {
+                                    scanScope(ifExp.thisSta, scope);
+                                }
+                            }
                         }
                     }
                     scope.statements.add(sta);
+                }
+            }
+            if (block.exp != null) {
+                if (block.exp instanceof IfExpression) {
+                    IfExpression ifExp = (IfExpression)block.exp;
+                    if (!scanScope(ifExp.thisSta, scope)) {
+                        has_error = true;
+                        return false;
+                    }
                 }
             }
         } else if (item instanceof ImplItem) {
@@ -216,6 +267,13 @@ public class Semantics {
             if (exp instanceof IfExpression) {
                 scope.type = Kind.IFEXP;
                 IfExpression exp_ = (IfExpression)exp;
+                List<IfExpression> ifList = getIfinBinary(exp_.condition);
+                if (ifList != null) {
+                    for (IfExpression ifExp : ifList) {
+                        scanScope(ifExp.thisSta, scope);
+                    }
+                }
+                exp_.thisSta.scope = scope;
                 scope.returnExpression = exp_.then_branch.exp;
                 List<Statement> statements = exp_.then_branch.statements;
                 for (Statement sta : statements) {
@@ -280,6 +338,18 @@ public class Semantics {
                                         has_error = true;
                                         return false;
                                     }
+                                    for (Expression exp__ : call.arguments) {
+                                        if (exp__ instanceof IfExpression) {
+                                            IfExpression ifExp = (IfExpression)exp__;
+                                            scanScope(ifExp.thisSta, parent);
+                                        }
+                                    }
+                                }
+                            }
+                            if (_exp_ instanceof BinaryExpression) {
+                                List<IfExpression> ifList_ = getIfinBinary(_exp_);
+                                for (IfExpression ifExp : ifList_) {
+                                    scanScope(ifExp.thisSta, scope);
                                 }
                             }
                         } else if (sta instanceof LetStatement) {
@@ -289,9 +359,27 @@ public class Semantics {
                                     has_error = true;
                                     return false;
                                 }
+                            } else {
+                                Expression exp__ = ((ExpressionStatement)(let.sta)).expression;
+                                if (exp__ instanceof BinaryExpression) {
+                                    BinaryExpression bi = (BinaryExpression)exp__;
+                                    List<IfExpression> ifList_ = getIfinBinary(bi);
+                                    for (IfExpression ifExp : ifList_) {
+                                        scanScope(ifExp.thisSta, scope);
+                                    }
+                                }
                             }
                         }
                         scope.statements.add(sta);
+                    }
+                }
+                if (exp_.then_branch.exp != null) {
+                    if (exp_.then_branch.exp instanceof IfExpression) {
+                        IfExpression ifExp = (IfExpression)exp_.then_branch.exp;
+                        if (!scanScope(ifExp.thisSta, scope)) {
+                            has_error = true;
+                            return false;
+                        }
                     }
                 }
                 if (exp_.else_branch instanceof IfExpression || exp_.else_branch instanceof BlockExpression) {
@@ -352,6 +440,12 @@ public class Semantics {
                                     }
                                 }
                             }
+                            if (_exp_ instanceof BinaryExpression) {
+                                List<IfExpression> ifList = getIfinBinary(_exp_);
+                                for (IfExpression ifExp : ifList) {
+                                    scanScope(ifExp.thisSta, scope);
+                                }
+                            }
                         }
                         if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
@@ -359,6 +453,15 @@ public class Semantics {
                                 if (!scanScope(let.sta, scope)) {
                                     has_error = true;
                                     return false;
+                                }
+                            } else {
+                                Expression exp__ = ((ExpressionStatement)(let.sta)).expression;
+                                if (exp__ instanceof BinaryExpression) {
+                                    BinaryExpression bi = (BinaryExpression)exp__;
+                                    List<IfExpression> ifList = getIfinBinary(bi);
+                                    for (IfExpression ifExp : ifList) {
+                                        scanScope(ifExp.thisSta, scope);
+                                    }
                                 }
                             }
                         }
@@ -369,6 +472,12 @@ public class Semantics {
             } else if (exp instanceof WhileExpression) {
                 scope.type = Kind.WHILEEXP;
                 WhileExpression exp_ = (WhileExpression)exp;
+                List<IfExpression> ifList = getIfinBinary(exp_.condition);
+                if (ifList != null) {
+                    for (IfExpression ifExp : ifList) {
+                        scanScope(ifExp.thisSta, scope);
+                    }
+                }
                 scope.returnExpression = exp_.body.exp;
                 List<Statement> statements = exp_.body.statements;
                 for (Statement sta : statements) {
@@ -420,6 +529,12 @@ public class Semantics {
                                     }
                                 }
                             }
+                            if (_exp_ instanceof BinaryExpression) {
+                                List<IfExpression> ifList_ = getIfinBinary(_exp_);
+                                for (IfExpression ifExp : ifList_) {
+                                    scanScope(ifExp.thisSta, scope);
+                                }
+                            }
                         }
                         if (sta instanceof LetStatement) {
                             LetStatement let = (LetStatement)sta;
@@ -427,6 +542,15 @@ public class Semantics {
                                 if (!scanScope(let.sta, scope)) {
                                     has_error = true;
                                     return false;
+                                }
+                            } else {
+                                Expression exp__ = ((ExpressionStatement)(let.sta)).expression;
+                                if (exp__ instanceof BinaryExpression) {
+                                    BinaryExpression bi = (BinaryExpression)exp__;
+                                    List<IfExpression> ifList_ = getIfinBinary(bi);
+                                    for (IfExpression ifExp : ifList_) {
+                                        scanScope(ifExp.thisSta, scope);
+                                    }
                                 }
                             }
                         }
@@ -501,6 +625,18 @@ public class Semantics {
                                         has_error = true;
                                         return false;
                                     }
+                                    for (Expression exp__ : call.arguments) {
+                                        if (exp__ instanceof IfExpression) {
+                                            IfExpression ifExp = (IfExpression)exp__;
+                                            scanScope(ifExp.thisSta, parent);
+                                        }
+                                    }
+                                }
+                            }
+                            if (_exp_ instanceof BinaryExpression) {
+                                List<IfExpression> ifList = getIfinBinary(_exp_);
+                                for (IfExpression ifExp : ifList) {
+                                    scanScope(ifExp.thisSta, scope);
                                 }
                             }
                         } else if (sta instanceof LetStatement) {
@@ -510,11 +646,29 @@ public class Semantics {
                                     has_error = true;
                                     return false;
                                 }
+                            } else {
+                                Expression exp__ = ((ExpressionStatement)(let.sta)).expression;
+                                if (exp__ instanceof BinaryExpression) {
+                                    BinaryExpression bi = (BinaryExpression)exp__;
+                                    List<IfExpression> ifList = getIfinBinary(bi);
+                                    for (IfExpression ifExp : ifList) {
+                                        scanScope(ifExp.thisSta, scope);
+                                    }
+                                }
                             }
                         }
                         scope.statements.add(sta);
                     }
                 }
+                if (exp_.exp != null) {
+                    if (exp_.exp instanceof IfExpression) {
+                        IfExpression ifExp = (IfExpression)exp_.exp;
+                        if (!scanScope(ifExp.thisSta, scope)) {
+                            has_error = true;
+                            return false;
+                        }
+                }
+            }
                 return true;
             }
         }
@@ -1358,7 +1512,7 @@ public class Semantics {
             if (has_error) {
                 return;
             }
-            System.out.println(statements.size());
+            // System.out.println(statements.size());
             if (sta instanceof LetStatement) {
                 LetStatement let = (LetStatement)sta;
                 if (!hasType(scope, let.type) || !expressionTypeCheck(let.initializer, let.type, scope)) {
@@ -1752,6 +1906,13 @@ public class Semantics {
         } else if (exp instanceof IdentifierExpression) {
             IdentifierExpression iden = (IdentifierExpression)exp;
             String name = iden.name;
+            if (name.equals("self")) {
+                if (scope.type == Kind.IMPL) {
+                    return scope.typeStruct;
+                } else {
+                    return getType(expScope, scope.parent, exp);
+                }
+            }
             for (Statement sta : scope.statements) {
                 if (sta instanceof LetStatement) {
                     LetStatement let = (LetStatement)sta;
@@ -2125,9 +2286,9 @@ public class Semantics {
         return firstCheckScope();
     }
     public void printScopeTree() {
-        System.out.println("===== Scope Tree =====");
-        printScopeRecursive(root, 0);
-        System.out.println("======================");
+        // System.out.println("===== Scope Tree =====");
+        // printScopeRecursive(root, 0);
+        // System.out.println("======================");
     }
     
     private void printScopeRecursive(Scope scope, int indent) {

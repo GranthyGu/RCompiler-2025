@@ -81,6 +81,25 @@ public class Main {
             } else {
                 System.out.println("\n出错了！！！");
             }
+
+            LLVMProgram llvmProgram = new LLVMProgram(parser, sem);
+            llvmProgram.build();
+                        String outputFileName = "output.ll"; // 默认名
+            if (inputFileName.contains(".")) {
+                outputFileName = inputFileName.substring(0, inputFileName.lastIndexOf('.')) + ".ll";
+            } else {
+                outputFileName = inputFileName + ".ll";
+            }
+
+            System.out.println("正在将 LLVM IR 写入文件: " + outputFileName);
+
+            // 2. 使用 Try-with-resources 自动关闭文件流
+            try (java.io.PrintStream fileOut = new java.io.PrintStream(new java.io.FileOutputStream(outputFileName))) {
+                // 将文件流传进去
+                llvmProgram.printAll(fileOut); 
+            } catch (java.io.IOException e) {
+                System.err.println("写入文件失败: " + e.getMessage());
+            }
         } catch (Exception e) {
             System.err.println("编译过程中发生异常: " + e.getMessage());
             e.printStackTrace();

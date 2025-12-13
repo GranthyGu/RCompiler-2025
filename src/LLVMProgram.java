@@ -2,7 +2,9 @@ package rcompiler2025.src;
 
 import java.util.*;
 
-abstract class IRInstructions {}
+abstract class IRInstructions {
+    void Print(java.io.PrintStream out) {}
+}
 
 enum BinaryOp {
     add, sub, mul, sdiv, srem, shl, ashr, and, or, xor,
@@ -23,11 +25,11 @@ class BinaryInstruction extends IRInstructions {
         this.operand2 = operand2;
         this.type = Type;
     }
-    void Print() {
-        System.out.printf("%s = ", result);
-        System.out.print(operator);
-        System.out.printf(" %s ", type);
-        System.out.printf("%s, %s\n", operand1, operand2);
+    void Print(java.io.PrintStream out) {
+        out.printf("%s = ", result);
+        out.print(operator);
+        out.printf(" %s ", type);
+        out.printf("%s, %s\n", operand1, operand2);
     }
 }
 class Br extends IRInstructions {
@@ -41,11 +43,11 @@ class Br extends IRInstructions {
         this.lable1 = lable1;
         this.lable2 = lable2;
     }
-    void Print() {
+    void Print(java.io.PrintStream out) {
         if (has_condition) {
-            System.out.printf("br i1 %s, label %s, label %s\n", condition, lable1, lable2);
+            out.printf("br i1 %s, label %%%s, label %%%s\n", condition, lable1, lable2);
         } else {
-            System.out.printf("br label %s\n", lable1);
+            out.printf("br label %%%s\n", lable1);
         }
     }
 }
@@ -58,11 +60,11 @@ class Ret extends IRInstructions {
         this.value = value;
         this.isVoid = isVoid;
     }
-    void Print() {
+    void Print(java.io.PrintStream out) {
         if (isVoid) {
-            System.out.println("ret void");
+            out.println("ret void");
         } else {
-            System.out.printf("ret %s %s\n", type, value);
+            out.printf("ret %s %s\n", type, value);
         }
     }
 }
@@ -73,8 +75,8 @@ class Alloca extends IRInstructions {
         this.result = result;
         this.type = type;
     }
-    void Print() {
-        System.out.printf("%s = alloca %s\n", result, type);
+    void Print(java.io.PrintStream out) {
+        out.printf("%s = alloca %s\n", result, type);
     }
 }
 class Load extends IRInstructions {
@@ -86,8 +88,8 @@ class Load extends IRInstructions {
         this.type = type;
         this.pointer = pointer;
     }
-    void Print() {
-        System.out.printf("%s = load %s, ptr %s\n", result, type, pointer);
+    void Print(java.io.PrintStream out) {
+        out.printf("%s = load %s, ptr %s\n", result, type, pointer);
     }
 }
 class Store extends IRInstructions {
@@ -99,8 +101,8 @@ class Store extends IRInstructions {
         this.type = type;
         this.pointer = pointer;
     }
-    void Print() {
-        System.out.printf("store %s %s, ptr %s\n", value, type, pointer);
+    void Print(java.io.PrintStream out) {
+        out.printf("store %s %s, ptr %s\n", type, value, pointer);
     }
 }
 class Getelementptr extends IRInstructions {
@@ -118,12 +120,12 @@ class Getelementptr extends IRInstructions {
         this.indices = indices;
         this.size = size;
     }
-    void Print() {
-        System.out.printf("%s = getelementptr %s, ptr %s", result, type, ptrval);
+    void Print(java.io.PrintStream out) {
+        out.printf("%s = getelementptr %s, ptr %s", result, type, ptrval);
         for (int i = 0; i < size; i++) {
-            System.out.printf(", %s %s", types.get(i), indices.get(i));
+            out.printf(", %s %s", types.get(i), indices.get(i));
         }
-        System.out.println();
+        out.println();
     }
 }
 class Icmp extends IRInstructions {
@@ -139,10 +141,10 @@ class Icmp extends IRInstructions {
         this.operand1 = operand1;
         this.operand2 = operand2;
     }
-    void Print() {
-        System.out.printf("%s = icmp ", result);
-        System.out.print(cond);
-        System.out.printf(" %s %s, %s\n", type, operand1, operand2);
+    void Print(java.io.PrintStream out) {
+        out.printf("%s = icmp ", result);
+        out.print(cond);
+        out.printf(" %s %s, %s\n", type, operand1, operand2);
     }
 }
 class Call extends IRInstructions {
@@ -160,12 +162,20 @@ class Call extends IRInstructions {
         this.values = values;
         this.size = size;
     }
-    void Print() {
-        System.out.printf("%s = call %s @%s(", result, resultType, functionName);
-        for (int i = 0; i < size - 1; i++) {
-            System.out.printf("%s %s, ", types.get(i), values.get(i));
+    void Print(java.io.PrintStream out) {
+        if (result == null) {
+            out.printf("call %s %s(", resultType, functionName);
+        } else {
+            out.printf("%s = call %s %s(", result, resultType, functionName);
         }
-        System.out.printf("%s %s)\n", types.get(size - 1), values.get(size - 1));
+        for (int i = 0; i < size - 1; i++) {
+            out.printf("%s %s, ", types.get(i), values.get(i));
+        }
+        if (size != 0) {
+            out.printf("%s %s)\n", types.get(size - 1), values.get(size - 1));
+        } else {
+            out.println(")");
+        }
     }
 }
 class Phi extends IRInstructions {
@@ -181,15 +191,15 @@ class Phi extends IRInstructions {
         this.lables = lables;
         this.size = size;
     }
-    void Print() {
-        System.out.printf("%s = phi %s ", result, type);
+    void Print(java.io.PrintStream out) {
+        out.printf("%s = phi %s ", result, type);
         for (int i = 0; i < size; i++) {
-            System.out.printf("[ %s, %s ]", values.get(i), lables.get(i));
+            out.printf("[ %s, %s ]", values.get(i), lables.get(i));
             if (i != size - 1) {
-                System.out.print(", ");
+                out.print(", ");
             }
         }
-        System.out.println();
+        out.println();
     }
 }
 class Select extends IRInstructions {
@@ -207,8 +217,8 @@ class Select extends IRInstructions {
         this.value1 = value1;
         this.value2 = value2;
     }
-    public void Print() {
-        System.out.printf("%s = select %s, %s %s, %s %s\n", result, condition, type1, value1, type2, value2);
+    public void Print(java.io.PrintStream out) {
+        out.printf("%s = select i1 %s, %s %s, %s %s\n", result, condition, type1, value1, type2, value2);
     }
 }
 class StructType extends IRInstructions {
@@ -218,16 +228,16 @@ class StructType extends IRInstructions {
         this.type = type;
         this.fields = fields;
     }
-    public void Print() {
-        System.out.print(type + " = type { ");
+    public void Print(java.io.PrintStream out) {
+        out.print(type + " = type { ");
         for (int i = 0; i < fields.size(); i++) {
             String field = fields.get(i);
-            System.out.print(field);
+            out.print(field);
             if (i != fields.size() - 1) {
-                System.out.print(", ");
+                out.print(", ");
             }
         }
-        System.out.println(" }\n");
+        out.println(" }\n");
     }
 }
 class Lable extends IRInstructions {
@@ -235,8 +245,8 @@ class Lable extends IRInstructions {
     public Lable(String name) {
         this.name = name;
     }
-    public void Print() {
-        System.out.println(name + ":\n");
+    public void Print(java.io.PrintStream out) {
+        out.println(name + ":\n");
     }
 }
 class Header extends IRInstructions {
@@ -244,21 +254,38 @@ class Header extends IRInstructions {
     public String returnType;
     public List<String> types;
     public List<String> names;
+    public boolean isDeclare = false;
     public Header(String name, String returnType, List<String> types, List<String> names) {
         this.name = name;
         this.returnType = returnType;
         this.types = types;
         this.names = names;
     }
-    public void Print() {
-        System.out.print("define " + returnType + " " + name + "(");
-        for (int i = 0; i < types.size(); i++) {
-            System.out.print(types.get(i) + " " + names.get(i));
-            if (i != types.size() - 1) {
-                System.out.print(", ");
+    public void Print(java.io.PrintStream out) {
+        if (isDeclare) {
+            out.print("declare " + returnType + " " + name + "(");
+            for (int i = 0; i < types.size(); i++) {
+                out.print(types.get(i));
+                if (i != types.size() - 1) {
+                    out.print(", ");
+                }
             }
+            out.println(")\n");
+        } else {
+            out.print("define ");
+            if (returnType != null) {
+                out.print(returnType + " " + name + "(");
+            } else {
+                out.print("void" + " " + name + "(");
+            }
+            for (int i = 0; i < types.size(); i++) {
+                out.print(types.get(i) + " " + names.get(i));
+                if (i != types.size() - 1) {
+                    out.print(", ");
+                }
+            }
+            out.println(") {");
         }
-        System.out.println(") {");
     }
 }
 class Constant extends IRInstructions {
@@ -270,8 +297,8 @@ class Constant extends IRInstructions {
         this.type = type;
         this.value = value;
     }
-    public void Print() {
-        System.out.printf("%s = constant %s %s\n", name, type, value);
+    public void Print(java.io.PrintStream out) {
+        out.printf("%s = constant %s %s\n", name, type, value);
     }
 }
 
@@ -284,15 +311,17 @@ class IRGenerator extends IRInstructions {
     public ImplItem currentImpl;
     private Map<Integer, String> tempIndexMap;
     private Semantics semantics;
+    private LLVMProgram llvm;
     public IRGenerator(FunctionItem fun, Map<String, Integer> variableNumMap, Map<String, String> variableTypeMap,
-                    ImplItem currentImpl, Scope root, Integer index, Semantics semantics) {
+                    ImplItem currentImpl, Scope root, Semantics semantics, Map<Integer, String> tempIndexMap, LLVMProgram llvm) {
         this.root = root;
         this.currentFunction = fun;
-        this.variableNumMap = new HashMap<>(variableNumMap);
-        this.variableTypeMap = new HashMap<>(variableTypeMap);
+        this.variableNumMap = variableNumMap;
+        this.llvm = llvm;
+        this.variableTypeMap = variableTypeMap;
         this.instructions = new ArrayList<>();
         this.currentImpl = currentImpl;
-        this.tempIndexMap = new HashMap<>();
+        this.tempIndexMap = tempIndexMap;
         this.semantics = semantics;
     }
     private String typeToString(Type type, Scope scope) {
@@ -300,13 +329,15 @@ class IRGenerator extends IRInstructions {
             TypePath typePath = (TypePath)type;
             String name = typePath.name;
             if (name.equals("i32")) {
-                return "i32";
+                return "i64";
             } else if (name.equals("isize") || name.equals("usize") || name.equals("u32")) {
                 return "i64";
             } else if (name.equals("bool")) {
                 return "i1";
             } else if (name.equals("char")) {
                 return "i8";
+            } else if (name.equals("114514")) {
+                return "i64";
             } else {
                 return "%struct." + name;
             }
@@ -370,21 +401,24 @@ class IRGenerator extends IRInstructions {
     }
     private List<IRInstructions> getLetStatements(Statement sta, Scope scope) {
         List<IRInstructions> instructions = new ArrayList<>();
-        Integer scopeNum = sta.scope.scopeIndex;
+        Integer scopeNum = scope.scopeIndex;
         LetStatement let = (LetStatement)sta;
         Pattern pattern = let.pattern;
         Type type = let.type;
         if (pattern instanceof ReferencePattern) {
             pattern = ((ReferencePattern)(pattern)).subPattern;
         }
+        List<IRInstructions> exprInstructions = getExpressions(let.initializer, let.sta.scope, scope, null, null);
+        if (exprInstructions != null) {instructions.addAll(exprInstructions);}
+        String variableName = targetVariableName(exprInstructions, let.initializer, scope);
         String name = '%' + ((IdentifierPattern)pattern).name + '_' + scopeNum;
         String typeStr = typeToString(type, scope);
+        if (variableNumMap.containsKey(name)) {
+            name = name + '_' + scopeNum;
+        }
         instructions.add(new Alloca(name, typeStr));
         variableTypeMap.put(name, typeStr);
         variableNumMap.put(name, 0);
-        List<IRInstructions> exprInstructions = getExpressions(let.initializer, let.sta.scope, scope, null, null);
-        instructions.addAll(exprInstructions);
-        String variableName = targetVariableName(exprInstructions, let.initializer, let.sta.scope);
         instructions.add(new Store(variableName, typeStr, name));
         return instructions;
     }
@@ -392,6 +426,10 @@ class IRGenerator extends IRInstructions {
         if (exp instanceof BinaryExpression) {
             BinaryExpression binary = (BinaryExpression)exp;
             if (binary.operator.equals("as")) {
+                if (instructions.get(instructions.size() - 1) instanceof Select) {
+                    Select select = (Select)instructions.get(instructions.size() - 1);
+                    return select.result;
+                }
                 return targetVariableName(instructions, binary.left, scope);
             }
             IRInstructions ins = instructions.get(instructions.size() - 1);
@@ -440,15 +478,22 @@ class IRGenerator extends IRInstructions {
                     String name = id.name;
                     Integer index = scope.scopeIndex;
                     String targetName = null;
+                    if (name.equals("self")) {
+                        String name_ = typeToString(currentImpl.type, scope) + '_' + currentFunction.scope.scopeIndex;
+                        return name_;
+                    }
                     while (true) {
                         String variableName = '%' + name + "_" + index;
-                        if (variableNumMap.containsKey(variableName)) {
+                        if (variableNumMap.containsKey(variableName + '_' + index)) {
+                            targetName = variableName + '_' + index;
+                            break;
+                        } else if (variableNumMap.containsKey(variableName)) {
                             targetName = variableName;
                             break;
                         } else {
                             scope = scope.parent;
                             if (scope == null) {
-                                System.out.println("Didn't find this variable!");
+                                System.err.println("&Undefined variable: " + name + ' ' + currentFunction.name);
                                 return null;
                             }
                             index = scope.scopeIndex;
@@ -491,8 +536,13 @@ class IRGenerator extends IRInstructions {
                 int value = (int)Char;
                 return ((Integer)value).toString();
             } else if (literal.literal_type == TokenType.INTERGER_LITERAL) {
-                Integer value = (Integer)(literal.value);
-                return value.toString();
+                if (literal.value instanceof Integer) {
+                    Integer value = (Integer)(literal.value);
+                    return value.toString();
+                } else {
+                    Long value = (Long)(literal.value);
+                    return value.toString();
+                }
             }
         } else if (exp instanceof IdentifierExpression) {
             IRInstructions ins = instructions.get(instructions.size() - 1);
@@ -520,7 +570,7 @@ class IRGenerator extends IRInstructions {
                     Load call = (Load)ins;
                     return call.result;
                 } else {
-                    System.out.println("Unmatch CallFunc or CallMethod ERROR!");
+                    System.out.println("Unmatch CallFunc or CallMethod ERROR!!");
                     return null;
                 }
             }
@@ -539,6 +589,7 @@ class IRGenerator extends IRInstructions {
                 return load.result;
             } else {
                 System.out.println("Unmatch BlockExpression ERROR!");
+                System.out.println(ins);
                 return null;
             }
         } else if (exp instanceof IfExpression) {
@@ -571,19 +622,18 @@ class IRGenerator extends IRInstructions {
         } else if (exp instanceof GroupedExpression) {
             return targetVariableName(instructions, ((GroupedExpression)exp).inner, scope);
         }
-        System.out.println("Unmatch Expression!");
+        System.out.println("Unmatch Expression!!" + exp.getClass().getName());
         return null;
     }
     private String targetVariableNameLeft(List<IRInstructions> instructions, Expression exp, Scope scope) {
         if (exp instanceof IdentifierExpression) {
-            String name = targetVariableName(instructions, exp, scope);
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < name.length(); i++) {
-                char c = name.charAt(i);
-                if (c == '.') break;
-                sb.append(c);
+            IRInstructions ins = instructions.get(instructions.size() - 1);
+            Load load = (Load)ins;
+            if (load.type.equals("ptr")) {
+                return load.result;
+            } else {
+                return load.pointer;
             }
-            return sb.toString();
         } else if (exp instanceof ArrIndexExpression || exp instanceof FieldExpression) {
             IRInstructions ins = instructions.get(instructions.size() - 2);
             if (ins instanceof Getelementptr) {
@@ -596,13 +646,13 @@ class IRGenerator extends IRInstructions {
         } else if (exp instanceof UnaryExpression) {
             UnaryExpression unaryExpression = (UnaryExpression)exp;
             if (unaryExpression.operator.equals("*")) {
-                return targetVariableName(getExpressions(unaryExpression.operand, scope, scope, null, null), unaryExpression.operand, scope);
+                instructions.remove(instructions.size() - 1);
+                return targetVariableName(instructions, unaryExpression.operand, scope);
             } else {
                 System.err.println("Unmatch UnaryExpression ERROR!");
                 return null;
             }
         } else {
-            System.out.println(exp);
             System.err.println("Unmatch Expression ERROR!");
             return null;
         }
@@ -612,7 +662,9 @@ class IRGenerator extends IRInstructions {
             String numPart = variableName.substring(7);
             Integer x = Integer.parseInt(numPart);
             return tempIndexMap.get(x);
-        } else {
+        } else if (variableName.charAt(0) - '0' >= 0 && variableName.charAt(0) - '0' <= 9) {
+            return "i64";
+        }else {
             int dotIndex = variableName.lastIndexOf('.');
             if (dotIndex != -1) {
                 String beforeDot = variableName.substring(0, dotIndex);
@@ -641,13 +693,18 @@ class IRGenerator extends IRInstructions {
         } else if (exp instanceof CallMethodExpression) {
             return getCallMethodExpression(exp, scope);
         } else if (exp instanceof BlockExpression) {
-            return getBlockExpression(exp, scope, startLable, endLable);
+            return getBlockExpression(exp, subScope, startLable, endLable);
         } else if (exp instanceof LoopExpression) {
             return getLoopExpression(exp, subScope, scope);
         } else if (exp instanceof WhileExpression) {
             return getWhileExpression(exp, subScope, scope);
         } else if (exp instanceof IfExpression) {
-            return getIfExpression(true, exp, subScope, scope, startLable, endLable, null);
+            IfExpression ifExpression = (IfExpression)exp;
+            boolean flag = false;
+            if (ifExpression.then_branch.exp != null && ifExpression.else_branch != null) {
+                flag = true;
+            }
+            return getIfExpression(flag, exp, ifExpression.thisSta.scope, scope, startLable, endLable, null, null);
         } else if (exp instanceof StructExpression) {
             return getStructExpression(exp, scope);
         } else if (exp instanceof ArrayExpression) {
@@ -657,7 +714,7 @@ class IRGenerator extends IRInstructions {
         } else if (exp instanceof ReturnExpression) {
             return getReturnExpression(exp, subScope, scope);
         }
-        System.out.println("Unmatch Expression!");
+        System.out.println("Unmatch Expression!" + exp.getClass().getName());
         return null;
     }
     private List<IRInstructions> getBinaryExpression(Expression exp, Scope scope) {
@@ -666,12 +723,12 @@ class IRGenerator extends IRInstructions {
         if (binary.operator.equals("=")) {
             Expression left = binary.left;
             Expression right = binary.right;
-            List<IRInstructions> list1 = getExpressions(left, scope, scope, null, null);
-            List<IRInstructions> list2 = getExpressions(right, scope, scope, null, null);
+            List<IRInstructions> list1 = getExpressions(left, binary.sta.scope, scope, null, null);
+            List<IRInstructions> list2 = getExpressions(right, binary.sta.scope, scope, null, null);
             String left_ = targetVariableNameLeft(list1, left, scope);
             String right_ = targetVariableName(list2, right, scope);
-            instructions.addAll(list1);
-            instructions.addAll(list2);
+            if (list1 != null) {instructions.addAll(list1);}
+            if (list2 != null) {instructions.addAll(list2);}
             String type = typeToString(semantics.getType(scope, scope, right), scope);
             instructions.add(new Store(right_, type, left_));
             return instructions;
@@ -685,10 +742,19 @@ class IRGenerator extends IRInstructions {
             List<IRInstructions> list2 = getExpressions(right, scope, scope, null, null);
             String left_ = targetVariableName(list1, left, scope);
             String right_ = targetVariableName(list2, right, scope);
-            instructions.addAll(list1);
-            instructions.addAll(list2);
+            if (list1 != null) {instructions.addAll(list1);}
+            if (list2 != null) {instructions.addAll(list2);}
             String newTemp = "%ttemp." + tempIndexMap.size();
-            String type = typeToString(semantics.getType(scope, scope, right), scope);
+            String type = null;
+            Type leftType = semantics.getType(scope, scope, left);
+            Type rightType = semantics.getType(scope, scope, right);
+            if (leftType instanceof TypePath && ((TypePath)leftType).name.equals("114514")) {
+                type = typeToString(semantics.getType(scope, scope, right), scope);
+            } else if (rightType instanceof TypePath && ((TypePath)rightType).name.equals("114514")) {
+                type = typeToString(semantics.getType(scope, scope, left), scope);
+            } else {
+                type = typeToString(semantics.getType(scope, scope, left), scope);
+            }
             tempIndexMap.put(tempIndexMap.size(), type);
             switch (binary.operator) {
                 case "+":
@@ -734,9 +800,10 @@ class IRGenerator extends IRInstructions {
             List<IRInstructions> list2 = getExpressions(right, scope, scope, null, null);
             String left_ = targetVariableName(list1, left, scope);
             String right_ = targetVariableName(list2, right, scope);
-            instructions.addAll(list1);
-            instructions.addAll(list2);
+            if (list1 != null) {instructions.addAll(list1);}
+            if (list2 != null) {instructions.addAll(list2);}
             String newTemp = "%ttemp." + tempIndexMap.size();
+            tempIndexMap.put(tempIndexMap.size(), "i1");
             Type type_ = semantics.getType(scope, scope, right);
             boolean flag = false;
             if (type_ instanceof TypePath) {
@@ -745,7 +812,16 @@ class IRGenerator extends IRInstructions {
                     flag = true;
                 }
             }
-            String type = typeToString(semantics.getType(scope, scope, right), scope);
+            String type = null;
+            Type leftType = semantics.getType(scope, scope, left);
+            Type rightType = semantics.getType(scope, scope, right);
+            if (leftType instanceof TypePath && ((TypePath)leftType).name.equals("114514")) {
+                type = typeToString(semantics.getType(scope, scope, right), scope);
+            } else if (rightType instanceof TypePath && ((TypePath)rightType).name.equals("114514")) {
+                type = typeToString(semantics.getType(scope, scope, left), scope);
+            } else {
+                type = typeToString(semantics.getType(scope, scope, left), scope);
+            }
             switch (binary.operator) {
                 case "==":
                     instructions.add(new Icmp(newTemp, Condition.eq, type, left_, right_));
@@ -796,9 +872,33 @@ class IRGenerator extends IRInstructions {
                    binary.operator.equals("|=") || binary.operator.equals("^=") || binary.operator.equals("<<=") || 
                    binary.operator.equals(">>=") ) {
             String operator = binary.operator.substring(0, binary.operator.length() - 1);
-            return getBinaryExpression(new BinaryExpression(binary.left, "=", new BinaryExpression(binary.left, operator, binary.right, null), null), scope);
+            BinaryExpression bi1 = new BinaryExpression(binary.left, operator, binary.right, null);
+            BinaryExpression bi2 = new BinaryExpression(binary.left, "=", bi1, null);
+            bi1.sta = bi2.sta = binary.sta;
+            return getBinaryExpression(bi2, scope);
         } else if (binary.operator.equals("as")) {
-            return getExpressions(binary.left, scope, scope, null, null);
+            List<IRInstructions> ins = getExpressions(binary.left, scope, scope, null, null);
+            if (ins != null) {instructions.addAll(ins);}
+            String targetVariable = targetVariableName(instructions, binary.left, scope);
+            String typeName = ((TypePath)(binary.type)).name;
+            if (typeName.equals("bool")) {
+                String newTemp = "%ttemp." + tempIndexMap.size();
+                tempIndexMap.put(tempIndexMap.size(), "i1");
+                instructions.add(new Icmp(newTemp, Condition.ne, "i64", targetVariable, "0"));
+                return instructions;
+            } else if (typeName.equals("i32") || typeName.equals("u32") || typeName.equals("isize") || typeName.equals("usize")) {
+                String typeStr = typeToString(semantics.getType(scope, scope, binary.left), scope);
+                if (typeStr.equals("i1")) {
+                    String newTemp = "%ttemp." + tempIndexMap.size();
+                    tempIndexMap.put(tempIndexMap.size(), "i32");
+                    instructions.add(new Select(newTemp, targetVariable, "i64", "i64", "1", "0"));
+                    return instructions;
+                } else {
+                    return getExpressions(binary.left, scope, scope, null, null);
+                }
+            } else {
+                return getExpressions(binary.left, scope, scope, null, null);
+            }
         } else {
             System.err.println("Undefined binary operator: " + binary.operator);
             return null;
@@ -809,7 +909,7 @@ class IRGenerator extends IRInstructions {
         List<IRInstructions> instructions = new ArrayList<>();
         if (unary.operator.equals("!")) {
             List<IRInstructions> instructions_ = getExpressions(unary.operand, null, scope, null, null);
-            instructions.addAll(instructions_);
+            if (instructions_ != null) {instructions.addAll(instructions_);}
             String targetVariable = targetVariableName(instructions, unary.operand, scope);
             String typeName = getType(targetVariable);
             if (typeName.equals("i1")) {
@@ -848,7 +948,7 @@ class IRGenerator extends IRInstructions {
             } else if (unary.operand instanceof ArrIndexExpression || unary.operand instanceof FieldExpression) {
                 List<IRInstructions> ins = getArrIndexOrFieldExpression(unary.operand, scope);
                 ins.remove(ins.size() - 1);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
                 return instructions;
             } else {
                 System.out.println("Undefined &x Unary Expression!");
@@ -856,7 +956,7 @@ class IRGenerator extends IRInstructions {
             }
         } else if (unary.operator.equals("-")) {
             List<IRInstructions> instructions_ = getExpressions(unary.operand, null, scope, null, null);
-            instructions.addAll(instructions_);
+            if (instructions_ != null) {instructions.addAll(instructions_);}
             String targetVariable = targetVariableName(instructions, unary.operand, scope);
             String typeName = getType(targetVariable);
             if (typeName.equals("i32")) {
@@ -877,7 +977,7 @@ class IRGenerator extends IRInstructions {
             }
         } else if (unary.operator.equals("*")) {
             List<IRInstructions> instructions_ = getExpressions(unary.operand, null, scope, null, null);
-            instructions.addAll(instructions_);
+            if (instructions_ != null) {instructions.addAll(instructions_);}
             String targetVariable = targetVariableName(instructions, unary.operand, scope);
             Type type = semantics.getType(scope, scope, exp);
             String typeStr = typeToString(type, scope);
@@ -897,17 +997,18 @@ class IRGenerator extends IRInstructions {
         Integer index = scope.scopeIndex;
         String targetName = null;
         String typeName = null;
-        if (variableNumMap.containsKey('@' + name)) {
-            String targetName_ = '@' + name + '.' + variableNumMap.get('@' + name);
+        if (variableTypeMap.containsKey('@' + name)) {
+            String targetName_ = '%' + name + '.' + variableNumMap.get('@' + name);
             variableNumMap.put('@' + name, variableNumMap.get('@' + name) + 1);
             typeName = variableTypeMap.get('@' + name);
             return new Load(targetName_, typeName, '@' + name);
+        } else if (variableTypeMap.containsKey('%' + name)) {
+            String targetName_ = '%' + name + '.' + variableNumMap.get('%' + name);
+            variableNumMap.put('%' + name, variableNumMap.get('%' + name) + 1);
+            typeName = variableTypeMap.get('%' + name);
+            return new Load(targetName_, typeName, '%' + name);
         } else if (name.equals("self")) {
-            Header header = (Header)(instructions.get(0));
-            String name_ = header.names.get(0);
-            if (name_.equals('%' + currentFunction.name + "_arr_" + currentFunction.scope.scopeIndex)) {
-                name_ = header.names.get(1);
-            }
+            String name_ = typeToString(currentImpl.type, scope) + '_' + currentFunction.scope.scopeIndex;
             String resultName = name_ + "." + variableNumMap.get(name_);
             variableNumMap.put(name_, variableNumMap.get(name_) + 1);
             typeName = variableTypeMap.get(name_);
@@ -915,14 +1016,18 @@ class IRGenerator extends IRInstructions {
         }
         while (true) {
             String variableName = '%' + name + "_" + index;
-            if (variableNumMap.containsKey(variableName)) {
+            if (variableNumMap.containsKey(variableName + '_' + index)) {
+                targetName = variableName + '_' + index;
+                typeName = variableTypeMap.get(variableName + '_' + index);
+                break;
+            } else if (variableNumMap.containsKey(variableName)) {
                 targetName = variableName;
                 typeName = variableTypeMap.get(targetName);
                 break;
             } else {
                 scope = scope.parent;
                 if (scope == null) {
-                    System.err.println("Undefined variable: " + name);
+                    System.err.println("Undefined variable: " + name + currentFunction.name);
                     return null;
                 }
                 index = scope.scopeIndex;
@@ -966,18 +1071,21 @@ class IRGenerator extends IRInstructions {
         }
         return 0;
     }
-    private Expression generateIndex(Expression exp, List<String> types, List<String> nums, Scope scope) {
+    private Expression generateIndex(Expression exp, List<String> types, List<String> nums, Scope scope, List<IRInstructions> instructions) {
         if (exp instanceof FieldExpression) {
             FieldExpression field = (FieldExpression)exp;
-            Expression exp_ = generateIndex(field.object, types, nums, scope);
+            Expression exp_ = generateIndex(field.object, types, nums, scope, instructions);
             types.add("i32");
-            nums.add(getIndexofFieldExpression(exp, field.member, scope).toString());
+            nums.add(getIndexofFieldExpression(field.object, field.member, scope).toString());
             return exp_;
         } else if (exp instanceof ArrIndexExpression) {
             ArrIndexExpression arrIndex = (ArrIndexExpression)exp;
-            Expression exp_ = generateIndex(arrIndex.object, types, nums, scope);
+            Expression exp_ = generateIndex(arrIndex.object, types, nums, scope, instructions);
+            List<IRInstructions> ins = getExpressions(arrIndex.index, scope, scope, null, null);
+            if (ins != null) {instructions.addAll(ins);}
+            String name = targetVariableName(ins, arrIndex.index, scope);
             types.add("i64");
-            nums.add(getValueInteger(arrIndex.index, scope).toString());
+            nums.add(name);
             return exp_;
         } else {
             return exp;
@@ -987,10 +1095,17 @@ class IRGenerator extends IRInstructions {
         List<IRInstructions> instructions = new ArrayList<>();
         List<String> types = new ArrayList<>();
         List<String> nums = new ArrayList<>();
-        Expression exp_ = generateIndex(exp, types, nums, scope);
+        Expression exp_ = generateIndex(exp, types, nums, scope, instructions);
+        types.add(0, "i32");
+        nums.add(0, "0");
         List<IRInstructions> instructions_ = getExpressions(exp_, null, scope, null, null);
-        instructions.addAll(instructions_);
-        String type = typeToString(semantics.getType(scope, scope, exp_), scope);
+        if (instructions_ != null) {instructions.addAll(instructions_);}
+        Type type_ = semantics.getType(scope, scope, exp_);
+        if (type_ instanceof ReferenceType) {
+            ReferenceType ref = (ReferenceType)type_;
+            type_ = ref.type;
+        }
+        String type = typeToString(type_, scope);
         String newTemp = "%ttemp." + tempIndexMap.size();
         tempIndexMap.put(tempIndexMap.size(), "ptr");
         String targetVariable = targetVariableNameLeft(instructions_, exp_, scope);
@@ -998,7 +1113,7 @@ class IRGenerator extends IRInstructions {
         String newTemp_ = "%ttemp." + tempIndexMap.size();
         String newType = typeToString(semantics.getType(scope, scope, exp), scope);
         tempIndexMap.put(tempIndexMap.size(), newType);
-        instructions.add(new Load(newTemp_, type, newTemp));
+        instructions.add(new Load(newTemp_, newType, newTemp));
         return instructions;
     }
     private List<IRInstructions> getCallFuncExpression(Expression exp, Scope scope) {
@@ -1022,7 +1137,7 @@ class IRGenerator extends IRInstructions {
                 }
             }
             String newTemp = "%ttemp." + tempIndexMap.size();
-            if (func.return_type instanceof ArrayType) {
+            if (func.return_type != null && func.return_type instanceof ArrayType) {
                 tempIndexMap.put(tempIndexMap.size(), typeToString(func.return_type, scope));
                 instructions.add(new Alloca(newTemp, typeToString(func.return_type, scope)));
                 variableNumMap.put(newTemp, 0);
@@ -1035,20 +1150,20 @@ class IRGenerator extends IRInstructions {
                 if (type instanceof ArrayType) {
                     types.add("ptr");
                     List<IRInstructions> ins = getExpressions(call.arguments.get(i), null, scope, null, null);
-                    instructions.addAll(ins);
+                    if (ins != null) {instructions.addAll(ins);}
                     String targetName = targetVariableName(ins, call.arguments.get(i), scope);
                     String newTemp_ = "%ttemp." + tempIndexMap.size();
                     tempIndexMap.put(tempIndexMap.size(), typeToString(type, scope));
                     variableNumMap.put(newTemp_, 0);
                     variableTypeMap.put(newTemp_, typeToString(type, scope));
                     instructions.add(new Alloca(newTemp_, typeToString(type, scope)));
-                    instructions.add(new Store(targetName, newTemp_, typeToString(type, scope)));
+                    instructions.add(new Store(targetName, typeToString(type, scope), newTemp_));
                     values.add(newTemp_);
                     continue;
                 }
                 types.add(typeToString(type, scope));
                 List<IRInstructions> ins = getExpressions(call.arguments.get(i), null, scope, null, null);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
                 String targetName = targetVariableName(ins, call.arguments.get(i), scope);
                 values.add(targetName);
             }
@@ -1057,11 +1172,11 @@ class IRGenerator extends IRInstructions {
                 String typeString = typeToString(returnType, scope);
                 String newTemp_ = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), typeString);
-                instructions.add(new Call(newTemp_, typeString, '@' + structName + '.' + func.name, types, values, types.size()));
+                instructions.add(new Call(newTemp_, typeString, "@struct." + structName + '.' + func.name, types, values, types.size()));
                 return instructions;
             } else {
                 String typeString = "void";
-                instructions.add(new Call(null, typeString, '@' + structName + '.' + func.name, types, values, types.size()));
+                instructions.add(new Call(null, typeString, "@struct." + structName + '.' + func.name, types, values, types.size()));
                 if (returnType instanceof ArrayType) {
                     String newTemp_ = "%ttemp." + tempIndexMap.size();
                     tempIndexMap.put(tempIndexMap.size(), typeToString(returnType, scope));
@@ -1071,18 +1186,51 @@ class IRGenerator extends IRInstructions {
             }
         }
         name = ((IdentifierExpression)call.call_).name;
-        Scope root = semantics.root;
+        if (name.equals("exit")) {
+            List<IRInstructions> instructions = new ArrayList<>();
+            List<IRInstructions> ins = getExpressions(call.arguments.get(0), null, scope, null, null);
+            if (ins != null) {instructions.addAll(ins);}
+            String targetName = targetVariableName(ins, call.arguments.get(0), scope);
+            instructions.add(new Call(null, "void", "@exit", List.of("i32"), List.of(targetName), 1));
+            return instructions;
+        } else if (name.equals("printlnInt")) {
+            List<IRInstructions> instructions = new ArrayList<>();
+            List<IRInstructions> ins = getExpressions(call.arguments.get(0), null, scope, null, null);
+            if (ins != null) {instructions.addAll(ins);}
+            String targetName = targetVariableName(ins, call.arguments.get(0), scope);
+            instructions.add(new Call(null, "void", "@printlnInt", List.of("i64"), List.of(targetName), 1));
+            return instructions;
+        } else if (name.equals("printInt")) {
+            List<IRInstructions> instructions = new ArrayList<>();
+            List<IRInstructions> ins = getExpressions(call.arguments.get(0), null, scope, null, null);
+            if (ins != null) {instructions.addAll(ins);}
+            String targetName = targetVariableName(ins, call.arguments.get(0), scope);
+            instructions.add(new Call(null, "void", "@printInt", List.of("i64"), List.of(targetName), 1));
+            return instructions;
+        } else if (name.equals("getInt")) {
+            List<IRInstructions> instructions = new ArrayList<>();
+            String newTemp = "%ttemp." + tempIndexMap.size();
+            tempIndexMap.put(tempIndexMap.size(), "i64");
+            instructions.add(new Call(newTemp, "i64", "@getInt", new ArrayList<>(), new ArrayList<>(), 0));
+            return instructions;
+        }
         FunctionItem func = null;
         List<String> types = new ArrayList<>();
         List<String> values = new ArrayList<>();
         List<IRInstructions> instructions = new ArrayList<>();
-        for (Map.Entry<String, Item> entry : root.valueMap.entrySet()) {
-            if (entry.getValue() instanceof FunctionItem && entry.getKey().equals(name)) {
-                func = (FunctionItem)(entry.getValue());
+        Scope temp = scope;
+        while (temp != null) {
+            for (Map.Entry<String, Item> entry : temp.valueMap.entrySet()) {
+                if (entry.getValue() instanceof FunctionItem && entry.getKey().equals(name)) {
+                    func = (FunctionItem)(entry.getValue());
+                    break;
+                }
             }
+            if (func != null) break;
+            temp = temp.parent;
         }
         String newTemp = "%ttemp." + tempIndexMap.size();
-        if (func.return_type instanceof ArrayType) {
+        if (func.return_type != null && func.return_type instanceof ArrayType) {
             tempIndexMap.put(tempIndexMap.size(), typeToString(func.return_type, scope));
             instructions.add(new Alloca(newTemp, typeToString(func.return_type, scope)));
             variableNumMap.put(newTemp, 0);
@@ -1095,25 +1243,25 @@ class IRGenerator extends IRInstructions {
             if (type instanceof ArrayType) {
                 types.add("ptr");
                 List<IRInstructions> ins = getExpressions(call.arguments.get(i), null, scope, null, null);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
                 String targetName = targetVariableName(ins, call.arguments.get(i), scope);
                 String newTemp_ = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), typeToString(type, scope));
                 variableNumMap.put(newTemp_, 0);
                 variableTypeMap.put(newTemp_, typeToString(type, scope));
                 instructions.add(new Alloca(newTemp_, typeToString(type, scope)));
-                instructions.add(new Store(targetName, newTemp_, typeToString(type, scope)));
+                instructions.add(new Store(targetName, typeToString(type, scope), newTemp_));
                 values.add(newTemp_);
                 continue;
             }
             types.add(typeToString(type, scope));
             List<IRInstructions> ins = getExpressions(call.arguments.get(i), null, scope, null, null);
-            instructions.addAll(ins);
+            if (ins != null) {instructions.addAll(ins);}
             String targetName = targetVariableName(ins, call.arguments.get(i), scope);
             values.add(targetName);
         }
         Type returnType = func.return_type;
-        if (returnType == null && !(returnType instanceof ArrayType)) {
+        if (returnType != null && !(returnType instanceof ArrayType)) {
             String typeString = typeToString(returnType, scope);
             String newTemp_ = "%ttemp." + tempIndexMap.size();
             tempIndexMap.put(tempIndexMap.size(), typeString);
@@ -1133,13 +1281,19 @@ class IRGenerator extends IRInstructions {
     private List<IRInstructions> getCallMethodExpression(Expression exp, Scope scope) {
         CallMethodExpression call = (CallMethodExpression)exp;
         List<IRInstructions> instructions = new ArrayList<>();
+        // Have risk for self.func
         Type type_ = semantics.getType(scope, scope, call.call_);
+        if (type_ instanceof ReferenceType) {
+            ReferenceType ref = (ReferenceType)type_;
+            type_ = ref.type;
+        }
         String typeStr = typeToString(type_, scope);
-        String methodName = '@' + typeStr + '.' + call.method_name;
+        String methodName = '@' + typeStr.substring(1) + '.' + call.method_name;
         FunctionItem func = null;
         boolean find = false;
+        String structName = typeStr.substring(8);
         for (Scope child : root.children) {
-            if (child.typeStruct != null && ((TypePath)(child.typeStruct)).name.equals(typeStr)) {
+            if (child.type == Kind.IMPL && ((TypePath)(child.typeStruct)).name.equals(structName)) {
                 for (Map.Entry<String, Item> entry : child.valueMap.entrySet()) {
                     if (entry.getValue() instanceof FunctionItem && entry.getKey().equals(call.method_name)) {
                         func = (FunctionItem)(entry.getValue());
@@ -1155,7 +1309,7 @@ class IRGenerator extends IRInstructions {
         List<String> types = new ArrayList<>();
         List<String> values = new ArrayList<>();
         String newTemp = "%ttemp." + tempIndexMap.size();
-        if (func.return_type instanceof ArrayType) {
+        if (func.return_type != null && func.return_type instanceof ArrayType) {
             tempIndexMap.put(tempIndexMap.size(), typeToString(func.return_type, scope));
             instructions.add(new Alloca(newTemp, typeToString(func.return_type, scope)));
             variableNumMap.put(newTemp, 0);
@@ -1163,48 +1317,53 @@ class IRGenerator extends IRInstructions {
             types.add("ptr");
             values.add(newTemp);
         }
-        if (func.parameters.get(0).isSelf) {
+        if (func.parameters.size() != 0 && func.parameters.get(0).isSelf) {
             if (func.parameters.get(0).isReference) {
                 List<IRInstructions> ins = getExpressions(new UnaryExpression("&", call.call_, true), null, scope, null, null);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
                 String targetName = targetVariableName(ins, new UnaryExpression("&", call.call_, true), scope);
                 types.add("ptr");
                 values.add(targetName);
             } else {
                 List<IRInstructions> ins = getExpressions(call.call_, null, scope, null, null);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
                 String targetName = targetVariableName(ins, call.call_, scope);
                 types.add(typeStr);
                 values.add(targetName);
             }
         } else {
             List<IRInstructions> ins = getExpressions(call.call_, null, scope, null, null);
-            instructions.addAll(ins);
+            if (ins != null) {instructions.addAll(ins);}
         }
+        boolean flag = func.parameters.size() != 0 && func.parameters.get(0).isSelf;
+        int index = flag ? 1 : 0;
         for (int i = 0; i < func.parameters.size(); i++) {
+            if (func.parameters.get(i).isSelf) {
+                continue;
+            }
             Type type = func.parameters.get(i).type;
             if (type instanceof ArrayType) {
                 types.add("ptr");
-                List<IRInstructions> ins = getExpressions(call.arguments.get(i), null, scope, null, null);
-                instructions.addAll(ins);
-                String targetName = targetVariableName(ins, call.arguments.get(i), scope);
+                List<IRInstructions> ins = getExpressions(call.arguments.get(i - index), null, scope, null, null);
+                if (ins != null) {instructions.addAll(ins);}
+                String targetName = targetVariableName(ins, call.arguments.get(i - index), scope);
                 String newTemp_ = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), typeToString(type, scope));
                 variableNumMap.put(newTemp_, 0);
                 variableTypeMap.put(newTemp_, typeToString(type, scope));
                 instructions.add(new Alloca(newTemp_, typeToString(type, scope)));
-                instructions.add(new Store(targetName, newTemp_, typeToString(type, scope)));
+                instructions.add(new Store(targetName, typeToString(type, scope), newTemp_));
                 values.add(newTemp_);
                 continue;
             }
             types.add(typeToString(type, scope));
-            List<IRInstructions> ins = getExpressions(call.arguments.get(i), null, scope, null, null);
-            instructions.addAll(ins);
-            String targetName = targetVariableName(ins, call.arguments.get(i), scope);
+            List<IRInstructions> ins = getExpressions(call.arguments.get(i - index), null, scope, null, null);
+            if (ins != null) {instructions.addAll(ins);}
+            String targetName = targetVariableName(ins, call.arguments.get(i - index), scope);
             values.add(targetName);
         }
         Type returnType = func.return_type;
-        if (returnType != null) {
+        if (returnType != null && !(returnType instanceof ArrayType)) {
             String typeString = typeToString(returnType, scope);
             String newTemp_ = "%ttemp." + tempIndexMap.size();
             tempIndexMap.put(tempIndexMap.size(), typeString);
@@ -1223,11 +1382,22 @@ class IRGenerator extends IRInstructions {
     private List<IRInstructions> getReturnExpression(Expression exp, Scope subScope, Scope scope) {
         List<IRInstructions> instructions = new ArrayList<>();
         ReturnExpression ret = (ReturnExpression)exp;
-        Type type_ = semantics.getType(subScope, scope, ret.value);
+        Type type_ = null;
+        if (ret.value != null) {
+            Scope temp = scope;
+            while (temp != null) {
+                if (temp.type == Kind.FUNCTION) {
+                    type_ = temp.returnType;
+                    break;
+                } else {
+                    temp = temp.parent;
+                }
+            }
+        }
         if (ret.value == null || type_ instanceof ArrayType) {
             if (type_ instanceof ArrayType) {
                 List<IRInstructions> ins = getExpressions(ret.value, subScope, scope, null, null);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
                 String targetName = targetVariableName(ins, ret.value, scope);
                 String name = '%' + currentFunction.name + "_arr_" + currentFunction.scope.scopeIndex;
                 instructions.add(new Store(targetName, typeToString(currentFunction.return_type, scope), name));
@@ -1236,10 +1406,9 @@ class IRGenerator extends IRInstructions {
             return instructions;
         } else {
             List<IRInstructions> ins = getExpressions(ret.value, subScope, scope, null, null);
-            instructions.addAll(ins);
+            if (ins != null) {instructions.addAll(ins);}
             String targetName = targetVariableName(ins, ret.value, scope);
-            Type type = semantics.getType(scope, scope, ret.value);
-            String typeStr = typeToString(type, scope);
+            String typeStr = typeToString(type_, scope);
             instructions.add(new Ret(typeStr, targetName, false));
             return instructions;
         }
@@ -1257,7 +1426,7 @@ class IRGenerator extends IRInstructions {
             Parameter field = structItem.fields.get(i);
             Expression valueExp = struct.fields.get(i).exp;
             List<IRInstructions> ins = getExpressions(valueExp, null, scope, null, null);
-            instructions.addAll(ins);
+            if (ins != null) {instructions.addAll(ins);}
             String targetName = targetVariableName(ins, valueExp, scope);
             String fieldType = typeToString(field.type, scope);
             String gepTemp = "%ttemp." + tempIndexMap.size();
@@ -1285,7 +1454,7 @@ class IRGenerator extends IRInstructions {
             for (int i = 0; i < array.elements.size(); i++) {
                 Expression valueExpression = array.elements.get(i);
                 List<IRInstructions> ins = getExpressions(valueExpression, null, scope, null, null);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
                 String targetName = targetVariableName(ins, valueExpression, scope);
                 String gepTemp = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), "ptr");
@@ -1301,7 +1470,7 @@ class IRGenerator extends IRInstructions {
         } else {
             Expression valueExpression = array.elements.get(0);
             List<IRInstructions> ins = getExpressions(valueExpression, null, scope, null, null);
-            instructions.addAll(ins);
+            if (ins != null) {instructions.addAll(ins);}
             String targetName = targetVariableName(ins, valueExpression, scope);
             Integer value = getValueInteger(array.elements.get(1), scope);
             for (int i = 0; i < value; i++) {
@@ -1329,31 +1498,36 @@ class IRGenerator extends IRInstructions {
                 Expression exp_ = ((ExpressionStatement)sta).expression;
                 if (exp_ instanceof BreakExpression) {
                     List<IRInstructions> ins = getBreakExpression(exp_, scope, endLable);
-                    instructions.addAll(ins);
+                    if (ins != null) {instructions.addAll(ins);}
                 } else if (exp_ instanceof ContinueExpression) {
                     List<IRInstructions> ins = getContinueExpression(exp_, scope, startLable);
-                    instructions.addAll(ins);
+                    if (ins != null) {instructions.addAll(ins);}
                 } else {
                     List<IRInstructions> ins = getExpressions(exp_, sta.scope, scope, startLable, endLable);
-                    instructions.addAll(ins);
+                    if (ins != null) {instructions.addAll(ins);}
                 }
             } else if (sta instanceof LetStatement) {
                 List<IRInstructions> ins = getLetStatements(sta, scope);
-                instructions.addAll(ins);
+                if (ins != null) {instructions.addAll(ins);}
             } else if (sta instanceof ConstItem) {
                 ConstItem constItem = (ConstItem)sta;
                 Integer num = getValueInteger(constItem.exp, root);
-                variableNumMap.put('@' + constItem.name, 0);
-                variableTypeMap.put('@' + constItem.name, typeToString(constItem.type, root));
-                Constant con = new Constant('@' + constItem.name, typeToString(constItem.type, root), num.toString());
-                instructions.add(con);
+                variableNumMap.put('%' + constItem.name, 0);
+                variableTypeMap.put('%' + constItem.name, typeToString(constItem.type, root));
+                instructions.add(new Alloca('%' + constItem.name, typeToString(constItem.type, root)));
+                instructions.add(new Store(num.toString(), typeToString(constItem.type, root), '%' + constItem.name));
             } else if (sta instanceof StructItem) {
                 StructItem structItem = (StructItem)sta;
                 List<String> typeList = new ArrayList<>();
                 for (Parameter field : structItem.fields) {
                     typeList.add(typeToString(field.type, scope));
                 }
-                instructions.add(new StructType("%struct." + structItem.name, typeList));
+                StructType struct_ = new StructType("%struct." + structItem.name, typeList);
+                llvm.instructions.add(0, struct_);
+            } else if (sta instanceof FunctionItem) {
+                IRGenerator ge = new IRGenerator((FunctionItem)sta, variableNumMap, variableTypeMap, null, semantics.root, semantics, tempIndexMap, llvm);
+                ge.build();
+                llvm.instructions.add(ge);
             }
         }
         // Handle the tail expression!
@@ -1361,12 +1535,30 @@ class IRGenerator extends IRInstructions {
         if (tailExp == null) {
             return instructions;
         } else {
-            List<IRInstructions> ins = getExpressions(tailExp, scope, scope, null, null);
+            List<IRInstructions> ins = new ArrayList<>();
+            if (tailExp instanceof IfExpression) {
+                IfExpression ifExp = (IfExpression)tailExp;
+                List<IRInstructions> ins_ = getExpressions(tailExp, ifExp.thisSta.scope, scope, null, null);
+                if (ins_ != null) {ins.addAll(ins_);}
+            } else if (tailExp instanceof ReturnExpression) {
+                List<IRInstructions> ins_ = getExpressions(tailExp, scope, scope, null, null);
+                if (ins_ != null) {instructions.addAll(ins_);}
+                return instructions;
+            } else {
+                List<IRInstructions> ins_ = getExpressions(tailExp, scope, scope, null, null);
+                if (ins_ != null) {ins.addAll(ins_);}
+            }
             String targetName = targetVariableName(ins, tailExp, scope);
             Type type = semantics.getType(scope, scope, tailExp);
             String typeStr = typeToString(type, scope);
-            if (scope.type == Kind.FUNCTION) {
-                instructions.addAll(ins);
+            if (scope.type == Kind.FUNCTION && !(tailExp instanceof ReturnExpression)) {
+                if (scope.returnType instanceof ArrayType) {
+                    if (ins != null) {instructions.addAll(ins);}
+                    instructions.add(new Store(targetName, typeStr, '%' + currentFunction.name + "_arr_" + currentFunction.scope.scopeIndex));
+                    instructions.add(new Ret("void", null, true));
+                    return instructions;
+                }
+                if (ins != null) {instructions.addAll(ins);}
                 instructions.add(new Ret(typeStr, targetName, false));
                 return instructions;
             }
@@ -1377,7 +1569,7 @@ class IRGenerator extends IRInstructions {
             String newTemp_ = "%ttemp." + tempIndexMap.size();
             tempIndexMap.put(tempIndexMap.size(), typeStr);
             ins.add(new Load(newTemp_, typeStr, newTemp));
-            instructions.addAll(ins);
+            if (ins != null) {instructions.addAll(ins);}
         }
         return instructions;
     }
@@ -1403,7 +1595,7 @@ class IRGenerator extends IRInstructions {
         instructions.add(new Lable(startLable));
         LoopExpression loop = (LoopExpression)exp;
         List<IRInstructions> bodyIns = getBlockExpression(loop.value, subScope, startLable, endLable);
-        instructions.addAll(bodyIns);
+        if (bodyIns != null) {instructions.addAll(bodyIns);}
         instructions.add(new Br(false, null, startLable, null));
         instructions.add(new Lable(endLable));
         return instructions;
@@ -1419,26 +1611,27 @@ class IRGenerator extends IRInstructions {
         instructions.add(new Lable(condLable));
         WhileExpression whileExp = (WhileExpression)exp;
         List<IRInstructions> condIns = getExpressions(whileExp.condition, null, scope, null, null);
-        instructions.addAll(condIns);
+        if (condIns != null) {instructions.addAll(condIns);}
         String condVar = targetVariableName(condIns, whileExp.condition, scope);
         instructions.add(new Br(true, condVar, bodyLable, endLable));
         instructions.add(new Lable(bodyLable));
         List<IRInstructions> bodyIns = getBlockExpression(whileExp.body, subScope, condLable, endLable);
-        instructions.addAll(bodyIns);
+        if (bodyIns != null) {instructions.addAll(bodyIns);}
         instructions.add(new Br(false, null, condLable, null));
         instructions.add(new Lable(endLable));
         return instructions;
     }
-    private List<IRInstructions> getIfExpression(boolean flag, Expression exp, Scope subScope, Scope scope, String startLable, String endLable, String endIfLable) {
+    private List<IRInstructions> getIfExpression(boolean flag, Expression exp, Scope subScope, Scope scope, String startLable, String endLable, String endIfLable, String newTemp_) {
         IfExpression ifExp = (IfExpression)exp;
-        Integer num = subScope.scopeIndex;
+        Integer num = ifExp.thisSta.scope.scopeIndex;
         String thenLable = "then_" + num;
         List<IRInstructions> instructions = new ArrayList<>();
+        String newTemp = newTemp_;
         if (endIfLable == null) {
             if (flag) {
-                Type type = semantics.getType(scope, scope, ifExp);
+                Type type = semantics.getType(ifExp.thisSta.scope, ifExp.thisSta.scope, ifExp);
                 String typeString = typeToString(type, scope);
-                String newTemp = "%ttemp." + tempIndexMap.size();
+                newTemp = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), typeString);
                 variableTypeMap.put(newTemp, typeString);
                 variableNumMap.put(newTemp, 0);
@@ -1448,13 +1641,13 @@ class IRGenerator extends IRInstructions {
         }
         String elseLable = "else_" + num;
         List<IRInstructions> condIns = getExpressions(ifExp.condition, null, scope, null, null);
-        instructions.addAll(condIns);
+        if (condIns != null) {instructions.addAll(condIns);}
         String condVar = targetVariableName(condIns, ifExp.condition, scope);
         if (ifExp.else_branch == null) {
             instructions.add(new Br(true, condVar, thenLable, endIfLable));
             instructions.add(new Lable(thenLable));
             List<IRInstructions> thenIns = getBlockExpression(ifExp.then_branch, subScope, startLable, endLable);
-            instructions.addAll(thenIns);
+            if (thenIns != null) {instructions.addAll(thenIns);}
             instructions.add(new Br(false, null, endIfLable, null));
             instructions.add(new Lable(endIfLable));
             return instructions;
@@ -1462,38 +1655,42 @@ class IRGenerator extends IRInstructions {
             instructions.add(new Br(true, condVar, thenLable, elseLable));
             instructions.add(new Lable(thenLable));
             List<IRInstructions> thenIns = getBlockExpression(ifExp.then_branch, subScope, startLable, endLable);
-            instructions.addAll(thenIns);
+            if (thenIns != null) {instructions.addAll(thenIns);}
             if (flag) {
                 String variable = targetVariableName(thenIns, ifExp.then_branch, subScope);
-                String name = "%ttemp." + (tempIndexMap.size() - 1);
-                instructions.add(new Store(variable, variableTypeMap.get(name), name));
+                int lastDot = newTemp.lastIndexOf('.');
+                Integer index = Integer.parseInt(newTemp.substring(lastDot + 1));
+                instructions.add(new Store(variable, tempIndexMap.get(index), newTemp));
             }
             instructions.add(new Br(false, null, endIfLable, null));
             instructions.add(new Lable(elseLable));
             if (ifExp.else_branch instanceof IfExpression) {
-                List<IRInstructions> elseIns = getIfExpression(flag, ifExp.else_branch, ifExp.sta.scope, scope, startLable, endLable, endIfLable);
-                instructions.addAll(elseIns);
+                List<IRInstructions> elseIns = getIfExpression(flag, ifExp.else_branch, ifExp.sta.scope, scope, startLable, endLable, endIfLable, newTemp);
+                if (elseIns != null) {instructions.addAll(elseIns);}
             } else if (ifExp.else_branch instanceof BlockExpression) {
                 List<IRInstructions> elseIns = getBlockExpression(ifExp.else_branch, ifExp.sta.scope, startLable, endLable);
-                instructions.addAll(elseIns);
+                if (elseIns != null) {instructions.addAll(elseIns);}
                 if (flag) {
                     String variable = targetVariableName(elseIns, ifExp.else_branch, ifExp.sta.scope);
-                    String name = "%ttemp." + (tempIndexMap.size() - 1);
-                    instructions.add(new Store(variable, variableTypeMap.get(name), name));
+                    int lastDot = newTemp.lastIndexOf('.');
+                    Integer index = Integer.parseInt(newTemp.substring(lastDot + 1));
+                    instructions.add(new Store(variable, tempIndexMap.get(index), newTemp));
                 }
                 instructions.add(new Br(false, null, endIfLable, null));
                 instructions.add(new Lable(endIfLable));
                 if (flag) {
-                    String name = "%ttemp." + (tempIndexMap.size() - 1);
-                    String newTemp = "%ttemp." + tempIndexMap.size();
-                    tempIndexMap.put(tempIndexMap.size(), variableTypeMap.get(name));
-                    instructions.add(new Load(newTemp, variableTypeMap.get(name), name));
+                    int lastDot = newTemp.lastIndexOf('.');
+                    Integer index = Integer.parseInt(newTemp.substring(lastDot + 1));
+                    String newTemp__ = "%ttemp." + tempIndexMap.size();
+                    tempIndexMap.put(tempIndexMap.size(), tempIndexMap.get(index));
+                    instructions.add(new Load(newTemp__, tempIndexMap.get(index), newTemp));
                 }
             }
             return instructions;
         }
     }
     public void build() {
+        // System.out.println(currentFunction.name);
         if (currentImpl == null) {
             List<String> types = new ArrayList<>();
             List<String> names = new ArrayList<>();
@@ -1507,28 +1704,43 @@ class IRGenerator extends IRInstructions {
                 if (param.type instanceof ArrayType) {
                     types.add("ptr");
                     Integer num = currentFunction.scope.scopeIndex;
-                    String name = '%' + param.name + '_' + num;
+                    Pattern pat = param.pattern;
+                    if (pat instanceof ReferencePattern) {
+                        ReferencePattern ref = (ReferencePattern)pat;
+                        pat = ref.subPattern;
+                    }
+                    String name = '%' + ((IdentifierPattern)pat).name + '_' + num;
                     variableNumMap.put(name, 0);
                     variableTypeMap.put(name, typeToString(param.type, root));
                     names.add(name);
                 } else if (param.type instanceof ReferenceType) {
                     Integer num = currentFunction.scope.scopeIndex;
-                    String name = "%temp." + param.name + '_' + num;
+                    Pattern pat = param.pattern;
+                    if (pat instanceof ReferencePattern) {
+                        ReferencePattern ref = (ReferencePattern)pat;
+                        pat = ref.subPattern;
+                    }
+                    String name = "%temp." + ((IdentifierPattern)pat).name + '_' + num;
                     types.add("ptr");
                     names.add(name);
-                    declares.add(new Alloca("%" + param.name + '_' + num, "ptr"));
-                    declares.add(new Store(name, typeToString(param.type, root), "%" + param.name + '_' + num));
-                    variableNumMap.put("%" + param.name + '_' + num, 0);
-                    variableTypeMap.put("%" + param.name + '_' + num, "ptr");
+                    declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num, "ptr"));
+                    declares.add(new Store(name, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num));
+                    variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num, 0);
+                    variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num, "ptr");
                 } else {
                     Integer num = currentFunction.scope.scopeIndex;
-                    String name = "%temp." + param.name + '_' + num;
+                    Pattern pat = param.pattern;
+                    if (pat instanceof ReferencePattern) {
+                        ReferencePattern ref = (ReferencePattern)pat;
+                        pat = ref.subPattern;
+                    }
+                    String name = "%temp." + ((IdentifierPattern)pat).name + '_' + num;
                     types.add(typeToString(param.type, root));
                     names.add(name);
-                    declares.add(new Alloca("%" + param.name + '_' + num, typeToString(param.type, root)));
-                    declares.add(new Store(name, typeToString(param.type, root), "%" + param.name + '_' + num));
-                    variableNumMap.put("%" + param.name + '_' + num, 0);
-                    variableTypeMap.put("%" + param.name + '_' + num, typeToString(param.type, root));
+                    declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num, typeToString(param.type, root)));
+                    declares.add(new Store(name, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num));
+                    variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num, 0);
+                    variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num, typeToString(param.type, root));
                 }
             }
             String returnType = "void";
@@ -1537,8 +1749,9 @@ class IRGenerator extends IRInstructions {
             }
             Header header = new Header('@' + currentFunction.name, returnType, types, names);
             instructions.add(header);
-            instructions.addAll(declares);
-            instructions.addAll(getBlockExpression(currentFunction.body, currentFunction.scope, null, null));
+            if (declares != null) {instructions.addAll(declares);}
+            List<IRInstructions> retIns = getBlockExpression(currentFunction.body, currentFunction.scope, null, null);
+            if (retIns != null) {instructions.addAll(retIns);}
         } else {
             List<String> types = new ArrayList<>();
             List<String> names = new ArrayList<>();
@@ -1559,7 +1772,7 @@ class IRGenerator extends IRInstructions {
                 names.add(nameArr);
             }
             if (implParams.size() == 0) {
-                header = new Header('@' + implType + '.' + currentFunction.name,
+                header = new Header('@' + implType.substring(1) + '.' + currentFunction.name,
                                     returnType, types, names);
             } else {
                 Parameter firstParam = implParams.get(0);
@@ -1567,7 +1780,7 @@ class IRGenerator extends IRInstructions {
                     if (firstParam.isReference) {
                         types.add("ptr");
                         Integer num = currentFunction.scope.scopeIndex;
-                        String name = '%' + implType + '_' + num;
+                        String name = implType + '_' + num;
                         variableNumMap.put(name, 0);
                         variableTypeMap.put(name, implType);
                         names.add(name);
@@ -1580,41 +1793,56 @@ class IRGenerator extends IRInstructions {
                             if (param.type instanceof ArrayType) {
                                 types.add("ptr");
                                 Integer num_ = currentFunction.scope.scopeIndex;
-                                String name_ = '%' + param.name + '_' + num_;
+                                Pattern pat = param.pattern;
+                                if (pat instanceof ReferencePattern) {
+                                    ReferencePattern ref = (ReferencePattern)pat;
+                                    pat = ref.subPattern;
+                                }
+                                String name_ = '%' + ((IdentifierPattern)pat).name + '_' + num_;
                                 variableNumMap.put(name_, 0);
                                 variableTypeMap.put(name_, typeToString(param.type, root));
                                 names.add(name_);
                             } else if (param.type instanceof ReferenceType) {
                                 Integer num_ = currentFunction.scope.scopeIndex;
-                                String name_ = "%temp." + param.name + '_' + num_;
+                                Pattern pat = param.pattern;
+                                if (pat instanceof ReferencePattern) {
+                                    ReferencePattern ref = (ReferencePattern)pat;
+                                    pat = ref.subPattern;
+                                }
+                                String name_ = "%temp." + ((IdentifierPattern)pat).name + '_' + num_;
                                 types.add("ptr");
                                 names.add(name_);
-                                declares.add(new Alloca("%" + param.name + '_' + num_, "ptr"));
-                                declares.add(new Store(name_, typeToString(param.type, root), "%" + param.name + '_' + num_));
-                                variableNumMap.put("%" + param.name + '_' + num_, 0);
-                                variableTypeMap.put("%" + param.name + '_' + num_, "ptr");
+                                declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num_, "ptr"));
+                                declares.add(new Store(name_, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num_));
+                                variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, 0);
+                                variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, "ptr");
                             } else {
                                 Integer num_ = currentFunction.scope.scopeIndex;
-                                String name_ = "%temp." + param.name + '_' + num_;
+                                Pattern pat = param.pattern;
+                                if (pat instanceof ReferencePattern) {
+                                    ReferencePattern ref = (ReferencePattern)pat;
+                                    pat = ref.subPattern;
+                                }
+                                String name_ = "%temp." + ((IdentifierPattern)pat).name + '_' + num_;
                                 types.add(typeToString(param.type, root));
                                 names.add(name_);
-                                declares.add(new Alloca("%" + param.name + '_' + num_, typeToString(param.type, root)));
-                                declares.add(new Store(name_, typeToString(param.type, root), "%" + param.name + '_' + num_));
-                                variableNumMap.put("%" + param.name + '_' + num_, 0);
-                                variableTypeMap.put("%" + param.name + '_' + num_, typeToString(param.type, root));
+                                declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num_, typeToString(param.type, root)));
+                                declares.add(new Store(name_, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num_));
+                                variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, 0);
+                                variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, typeToString(param.type, root));
                             }
                         }
-                        header = new Header('@' + implType + '.' + currentFunction.name, 
+                        header = new Header('@' + implType.substring(1) + '.' + currentFunction.name, 
                                                 returnType, types, names);
                     } else {
                         types.add(implType);
                         Integer num = currentFunction.scope.scopeIndex;
-                        String name = "%temp." + implType + '_' + num;
+                        String name = "%temp." + implType.substring(1) + '_' + num;
                         names.add(name);
-                        declares.add(new Alloca("%" + implType + '_' + num, implType));
-                        declares.add(new Store(name, implType, "%" + implType + '_' + num));
-                        variableNumMap.put("%" + implType + '_' + num, 0);
-                        variableTypeMap.put("%" + implType + '_' + num, implType);
+                        declares.add(new Alloca(implType + '_' + num, implType));
+                        declares.add(new Store(name, implType, implType + '_' + num));
+                        variableNumMap.put(implType + '_' + num, 0);
+                        variableTypeMap.put(implType + '_' + num, implType);
                         boolean flag = true;
                         for (Parameter param : currentFunction.parameters) {
                             if (flag) {
@@ -1624,31 +1852,46 @@ class IRGenerator extends IRInstructions {
                             if (param.type instanceof ArrayType) {
                                 types.add("ptr");
                                 Integer num_ = currentFunction.scope.scopeIndex;
-                                String name_ = '%' + param.name + '_' + num_;
+                                Pattern pat = param.pattern;
+                                if (pat instanceof ReferencePattern) {
+                                    ReferencePattern ref = (ReferencePattern)pat;
+                                    pat = ref.subPattern;
+                                }
+                                String name_ = '%' + ((IdentifierPattern)pat).name + '_' + num_;
                                 variableNumMap.put(name_, 0);
                                 variableTypeMap.put(name_, typeToString(param.type, root));
                                 names.add(name_);
                             } else if (param.type instanceof ReferenceType) {
                                 Integer num_ = currentFunction.scope.scopeIndex;
-                                String name_ = "%temp." + param.name + '_' + num_;
+                                Pattern pat = param.pattern;
+                                if (pat instanceof ReferencePattern) {
+                                    ReferencePattern ref = (ReferencePattern)pat;
+                                    pat = ref.subPattern;
+                                }
+                                String name_ = "%temp." + ((IdentifierPattern)pat).name + '_' + num_;
                                 types.add("ptr");
                                 names.add(name_);
-                                declares.add(new Alloca("%" + param.name + '_' + num_, "ptr"));
-                                declares.add(new Store(name_, typeToString(param.type, root), "%" + param.name + '_' + num_));
-                                variableNumMap.put("%" + param.name + '_' + num_, 0);
-                                variableTypeMap.put("%" + param.name + '_' + num_, "ptr");
+                                declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num_, "ptr"));
+                                declares.add(new Store(name_, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num_));
+                                variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, 0);
+                                variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, "ptr");
                             } else {
                                 Integer num_ = currentFunction.scope.scopeIndex;
-                                String name_ = "%temp." + param.name + '_' + num_;
+                                Pattern pat = param.pattern;
+                                if (pat instanceof ReferencePattern) {
+                                    ReferencePattern ref = (ReferencePattern)pat;
+                                    pat = ref.subPattern;
+                                }
+                                String name_ = "%temp." + ((IdentifierPattern)pat).name + '_' + num_;
                                 types.add(typeToString(param.type, root));
                                 names.add(name_);
-                                declares.add(new Alloca("%" + param.name + '_' + num_, typeToString(param.type, root)));
-                                declares.add(new Store(name_, typeToString(param.type, root), "%" + param.name + '_' + num_));
-                                variableNumMap.put("%" + param.name + '_' + num_, 0);
-                                variableTypeMap.put("%" + param.name + '_' + num_, typeToString(param.type, root));
+                                declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num_, typeToString(param.type, root)));
+                                declares.add(new Store(name_, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num_));
+                                variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, 0);
+                                variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, typeToString(param.type, root));
                             }
                         }
-                        header = new Header('@' + implType + '.' + currentFunction.name, 
+                        header = new Header('@' + implType.substring(1) + '.' + currentFunction.name, 
                                                 returnType, types, names);
                     }
                 } else {
@@ -1656,61 +1899,98 @@ class IRGenerator extends IRInstructions {
                         if (param.type instanceof ArrayType) {
                             types.add("ptr");
                             Integer num_ = currentFunction.scope.scopeIndex;
-                            String name_ = '%' + param.name + '_' + num_;
+                            Pattern pat = param.pattern;
+                            if (pat instanceof ReferencePattern) {
+                                ReferencePattern ref = (ReferencePattern)pat;
+                                pat = ref.subPattern;
+                            }
+                            String name_ = '%' + ((IdentifierPattern)pat).name + '_' + num_;
                             variableNumMap.put(name_, 0);
                             variableTypeMap.put(name_, typeToString(param.type, root));
                             names.add(name_);
                         } else if (param.type instanceof ReferenceType) {
                             Integer num_ = currentFunction.scope.scopeIndex;
-                            String name_ = "%temp." + param.name + '_' + num_;
+                            Pattern pat = param.pattern;
+                            if (pat instanceof ReferencePattern) {
+                                ReferencePattern ref = (ReferencePattern)pat;
+                                pat = ref.subPattern;
+                            }
+                            String name_ = "%temp." + ((IdentifierPattern)pat).name + '_' + num_;
                             types.add("ptr");
                             names.add(name_);
-                            declares.add(new Alloca("%" + param.name + '_' + num_, "ptr"));
-                            declares.add(new Store(name_, typeToString(param.type, root), "%" + param.name + '_' + num_));
-                            variableNumMap.put("%" + param.name + '_' + num_, 0);
-                            variableTypeMap.put("%" + param.name + '_' + num_, "ptr");
+                            declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num_, "ptr"));
+                            declares.add(new Store(name_, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num_));
+                            variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, 0);
+                            variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, "ptr");
                         } else {
                             Integer num_ = currentFunction.scope.scopeIndex;
-                            String name_ = "%temp." + param.name + '_' + num_;
+                            Pattern pat = param.pattern;
+                            if (pat instanceof ReferencePattern) {
+                                ReferencePattern ref = (ReferencePattern)pat;
+                                pat = ref.subPattern;
+                            }
+                            String name_ = "%temp." + ((IdentifierPattern)pat).name + '_' + num_;
                             types.add(typeToString(param.type, root));
                             names.add(name_);
-                            declares.add(new Alloca("%" + param.name + '_' + num_, typeToString(param.type, root)));
-                            declares.add(new Store(name_, typeToString(param.type, root), "%" + param.name + '_' + num_));
-                            variableNumMap.put("%" + param.name + '_' + num_, 0);
-                            variableTypeMap.put("%" + param.name + '_' + num_, typeToString(param.type, root));
+                            declares.add(new Alloca("%" + ((IdentifierPattern)pat).name + '_' + num_, typeToString(param.type, root)));
+                            declares.add(new Store(name_, typeToString(param.type, root), "%" + ((IdentifierPattern)pat).name + '_' + num_));
+                            variableNumMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, 0);
+                            variableTypeMap.put("%" + ((IdentifierPattern)pat).name + '_' + num_, typeToString(param.type, root));
                         }
                     }
-                    header = new Header('@' + implType + '.' + currentFunction.name, 
+                    header = new Header('@' + implType.substring(1) + '.' + currentFunction.name, 
                                             returnType, types, names);
                 }
             }
             instructions.add(header);
-            instructions.addAll(declares);
-            instructions.addAll(getBlockExpression(currentFunction.body, currentFunction.scope, null, null));
+            if (declares != null) {instructions.addAll(declares);}
+            List<IRInstructions> retIns = getBlockExpression(currentFunction.body, currentFunction.scope, null, null);
+            if (retIns != null) {instructions.addAll(retIns);}
         }
+        if (currentFunction.return_type == null || currentFunction.return_type instanceof ArrayType) {
+            instructions.add(new Ret(null, null, true));
+        } else if (!(instructions.get(instructions.size() - 1) instanceof Ret)) {
+            if (currentFunction.return_type instanceof ReferenceType) {
+                instructions.add(new Ret("ptr", null, false));
+            } else if (typeToString(currentFunction.return_type, root).equals("i64")) {
+                instructions.add(new Ret("i64", "0", false));
+            } else if (typeToString(currentFunction.return_type, root).equals("i1")) {
+                instructions.add(new Ret("i1", "true", false));
+            } else {
+                instructions.add(new Ret(typeToString(currentFunction.return_type, root), null, false));
+            }
+        }
+    }
+    void Print(java.io.PrintStream out) {
+        for (IRInstructions ins : instructions) {
+            ins.Print(out);
+        }
+        out.println("}");
     }
 }
 
 public class LLVMProgram {
-    private List<IRInstructions> instructions;
+    public List<IRInstructions> instructions;
     private List<Item> program;
     private Scope root;
-    private Integer tempIndex = 0;
     private Semantics semantics;
     private Map<String, Integer> variableNumMap;
     private Map<String, String> variableTypeMap;
+    private Map<Integer, String> tempIndexMap;
     private String typeToString(Type type, Scope scope) {
         if (type instanceof TypePath) {
             TypePath typePath = (TypePath)type;
             String name = typePath.name;
             if (name.equals("i32") || name.equals("u32")) {
-                return "i32";
+                return "i64";
             } else if (name.equals("isize") || name.equals("usize")) {
                 return "i64";
             } else if (name.equals("bool")) {
                 return "i1";
             } else if (name.equals("char")) {
                 return "i8";
+            } else if (name.equals("114514")) {
+                return "i64";
             } else {
                 return "%struct." + name;
             }
@@ -1779,6 +2059,7 @@ public class LLVMProgram {
         this.semantics = semantics;
         this.variableNumMap = new HashMap<>();
         this.variableTypeMap = new HashMap<>();
+        this.tempIndexMap = new HashMap<>();
         for (Item item : program) {
             if (item instanceof ConstItem) {
                 ConstItem constItem = (ConstItem) item;
@@ -1812,23 +2093,42 @@ public class LLVMProgram {
         }
     }
     public void build() {
+        List<String> typeList = new ArrayList<>();
+        typeList.add("i64");
+        Header declareExit = new Header("@exit", "void", typeList, null);
+        declareExit.isDeclare = true;
+        this.instructions.add(declareExit);
+        Header declarePrintln = new Header("@printlnInt", "void", typeList, null);
+        declarePrintln.isDeclare = true;
+        this.instructions.add(declarePrintln);
+        Header declareGetInt = new Header("@getInt", "i64", new ArrayList<>(), null);
+        declareGetInt.isDeclare = true;
+        this.instructions.add(declareGetInt);
+        Header declarePrint = new Header("@printInt", "void", typeList, null);
+        declarePrint.isDeclare = true;
+        this.instructions.add(declarePrint);
         for (Item item : program) {
             if (item instanceof ImplItem) {
                 ImplItem impl = (ImplItem) item;
                 for (Item item_ : impl.AssociatedItems) {
                     if (item_ instanceof FunctionItem) {
                         FunctionItem fun = (FunctionItem) item_;
-                        IRGenerator irGenerator = new IRGenerator(fun, variableNumMap, variableTypeMap, impl, root, tempIndex, semantics);
+                        IRGenerator irGenerator = new IRGenerator(fun, variableNumMap, variableTypeMap, impl, root, semantics, tempIndexMap, this);
                         irGenerator.build();
                         this.instructions.add(irGenerator);
                     }
                 }
             } else if (item instanceof FunctionItem) {
                 FunctionItem fun = (FunctionItem) item;
-                IRGenerator irGenerator = new IRGenerator(fun, variableNumMap, variableTypeMap, null, root, tempIndex, semantics);
+                IRGenerator irGenerator = new IRGenerator(fun, variableNumMap, variableTypeMap, null, root, semantics, tempIndexMap, this);
                 irGenerator.build();
                 this.instructions.add(irGenerator);
             }
+        }
+    }
+    public void printAll(java.io.PrintStream out) {
+        for (IRInstructions ins : instructions) {
+            ins.Print(out);
         }
     }
 }

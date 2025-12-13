@@ -8,3 +8,8 @@ errors.txt
 /compileResult
 /result
 /out
+a.out
+in.ll
+in.out
+run_tests_.sh
+todo.txt

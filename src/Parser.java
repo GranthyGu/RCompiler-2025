@@ -15,6 +15,7 @@ class BinaryExpression extends Expression {
     public String operator;
     public Expression right;
     public Type type;
+    public Statement sta;
     public BinaryExpression(Expression left, String operator, Expression right, Type type) {
         this.left = left;
         this.operator = operator;
@@ -154,6 +155,7 @@ class IfExpression extends Expression {
     public BlockExpression then_branch;
     public Expression else_branch;
     public ExpressionStatement sta;
+    public ExpressionStatement thisSta;
     public IfExpression(Expression condition, BlockExpression then_branch, Expression else_branch) {
         this.condition = condition;
         this.then_branch = then_branch;
@@ -430,7 +432,9 @@ public class Parser {
             operator = tk.value;
             current_index++;
             Type tp = ParseType();
-            return new BinaryExpression(left, operator, null, tp);
+            BinaryExpression binary = new BinaryExpression(left, operator, null, tp);
+            binary.sta = new ExpressionStatement(null);
+            return binary;
         } else {
             has_error = true;
             return null;
@@ -446,7 +450,9 @@ public class Parser {
             has_error = true;
             return null;
         }
-        return new BinaryExpression(left, operator, right, null);
+        BinaryExpression binary = new BinaryExpression(left, operator, right, null);
+        binary.sta = new ExpressionStatement(binary.right);
+        return binary;
     }
     private UnaryExpression ParseUnaryExpression() {
         if (has_error) {
@@ -671,7 +677,36 @@ public class Parser {
                 return new BlockExpression(list, exp, isconst);
             }
         }
+        if (list.size() > 0) {
+            Statement sta = list.get(list.size() - 1);
+            if (sta instanceof ExpressionStatement) {
+                Expression exp = ((ExpressionStatement) sta).expression;
+                if (exp instanceof IfExpression) {
+                    IfExpression ifExp = (IfExpression) exp;
+                    boolean flag = isTailExpression(ifExp);
+                    if (flag) {
+                        list.remove(list.size() - 1);
+                        return new BlockExpression(list, exp, isconst);
+                    }
+                }
+            }
+        }
         return new BlockExpression(list, null, isconst);
+    }
+    private boolean isTailExpression(IfExpression if_Expression) {
+        BlockExpression then = if_Expression.then_branch;
+        if (then.exp != null) {
+            return true;
+        } else {
+            if (then.statements.size() != 0 && then.statements.get(then.statements.size() - 1) instanceof ExpressionStatement) {
+                Expression exp_ = ((ExpressionStatement) then.statements.get(then.statements.size() - 1)).expression;
+                if (exp_ instanceof IfExpression) {
+                    IfExpression ifExp = (IfExpression) exp_;
+                    return isTailExpression(ifExp);
+                }
+            }
+        }
+        return false;
     }
     private BreakExpression ParseBreakExpression() {
         if (has_error) {
@@ -859,9 +894,13 @@ public class Parser {
                 has_error = true;
                 return null;
             }
-            return new IfExpression(exp, block, exp_);
+            IfExpression if_ = new IfExpression(exp, block, exp_);
+            if_.thisSta = new ExpressionStatement(if_);
+            return if_;
         }
-        return new IfExpression(exp, block, null);
+        IfExpression if__ = new IfExpression(exp, block, null);
+        if__.thisSta = new ExpressionStatement(if__);
+        return if__;
     }
     private PathExpression ParsePathExpression() {
         if (has_error) {

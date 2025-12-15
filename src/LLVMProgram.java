@@ -7,7 +7,7 @@ abstract class IRInstructions {
 }
 
 enum BinaryOp {
-    add, sub, mul, sdiv, srem, shl, ashr, and, or, xor,
+    add, sub, mul, sdiv, srem, urem, udiv, shl, ashr, and, or, xor,
 }
 enum Condition {
     eq, ne, ugt, uge, ult, ule, sgt, sge, slt, sle
@@ -329,15 +329,15 @@ class IRGenerator extends IRInstructions {
             TypePath typePath = (TypePath)type;
             String name = typePath.name;
             if (name.equals("i32")) {
-                return "i64";
+                return "i32";
             } else if (name.equals("isize") || name.equals("usize") || name.equals("u32")) {
-                return "i64";
+                return "i32";
             } else if (name.equals("bool")) {
                 return "i1";
             } else if (name.equals("char")) {
                 return "i8";
             } else if (name.equals("114514")) {
-                return "i64";
+                return "i32";
             } else {
                 return "%struct." + name;
             }
@@ -663,7 +663,7 @@ class IRGenerator extends IRInstructions {
             Integer x = Integer.parseInt(numPart);
             return tempIndexMap.get(x);
         } else if (variableName.charAt(0) - '0' >= 0 && variableName.charAt(0) - '0' <= 9) {
-            return "i64";
+            return "i32";
         }else {
             int dotIndex = variableName.lastIndexOf('.');
             if (dotIndex != -1) {
@@ -756,6 +756,21 @@ class IRGenerator extends IRInstructions {
                 type = typeToString(semantics.getType(scope, scope, left), scope);
             }
             tempIndexMap.put(tempIndexMap.size(), type);
+            Type type_ = semantics.getType(scope, scope, left);
+            Type type__ = semantics.getType(scope, scope, right);
+            boolean flag = false;
+            if (type_ instanceof TypePath) {
+                TypePath typePath = (TypePath) type_;
+                if (typePath.name.equals("u32") || typePath.name.equals("usize")) {
+                    flag = true;
+                }
+            }
+            if (type__ instanceof TypePath) {
+                TypePath typePath = (TypePath) type__;
+                if (typePath.name.equals("u32") || typePath.name.equals("usize")) {
+                    flag = true;
+                }
+            }
             switch (binary.operator) {
                 case "+":
                     instructions.add(new BinaryInstruction(newTemp, BinaryOp.add, left_, right_, type));
@@ -767,10 +782,18 @@ class IRGenerator extends IRInstructions {
                     instructions.add(new BinaryInstruction(newTemp, BinaryOp.mul, left_, right_, type));
                     break;
                 case "/":
-                    instructions.add(new BinaryInstruction(newTemp, BinaryOp.sdiv, left_, right_, type));
+                    if (flag) {
+                        instructions.add(new BinaryInstruction(newTemp, BinaryOp.udiv, left_, right_, type));
+                    } else {
+                        instructions.add(new BinaryInstruction(newTemp, BinaryOp.sdiv, left_, right_, type));
+                    }
                     break;
                 case "%":
-                    instructions.add(new BinaryInstruction(newTemp, BinaryOp.srem, left_, right_, type));
+                    if (flag) {
+                        instructions.add(new BinaryInstruction(newTemp, BinaryOp.urem, left_, right_, type));
+                    } else {
+                        instructions.add(new BinaryInstruction(newTemp, BinaryOp.srem, left_, right_, type));
+                    }
                     break;
                 case "&":
                     instructions.add(new BinaryInstruction(newTemp, BinaryOp.and, left_, right_, type));
@@ -884,14 +907,14 @@ class IRGenerator extends IRInstructions {
             if (typeName.equals("bool")) {
                 String newTemp = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), "i1");
-                instructions.add(new Icmp(newTemp, Condition.ne, "i64", targetVariable, "0"));
+                instructions.add(new Icmp(newTemp, Condition.ne, "i32", targetVariable, "0"));
                 return instructions;
             } else if (typeName.equals("i32") || typeName.equals("u32") || typeName.equals("isize") || typeName.equals("usize")) {
                 String typeStr = typeToString(semantics.getType(scope, scope, binary.left), scope);
                 if (typeStr.equals("i1")) {
                     String newTemp = "%ttemp." + tempIndexMap.size();
                     tempIndexMap.put(tempIndexMap.size(), "i32");
-                    instructions.add(new Select(newTemp, targetVariable, "i64", "i64", "1", "0"));
+                    instructions.add(new Select(newTemp, targetVariable, "i32", "i32", "1", "0"));
                     return instructions;
                 } else {
                     return getExpressions(binary.left, scope, scope, null, null);
@@ -1084,7 +1107,7 @@ class IRGenerator extends IRInstructions {
             List<IRInstructions> ins = getExpressions(arrIndex.index, scope, scope, null, null);
             if (ins != null) {instructions.addAll(ins);}
             String name = targetVariableName(ins, arrIndex.index, scope);
-            types.add("i64");
+            types.add("i32");
             nums.add(name);
             return exp_;
         } else {
@@ -1198,20 +1221,20 @@ class IRGenerator extends IRInstructions {
             List<IRInstructions> ins = getExpressions(call.arguments.get(0), null, scope, null, null);
             if (ins != null) {instructions.addAll(ins);}
             String targetName = targetVariableName(ins, call.arguments.get(0), scope);
-            instructions.add(new Call(null, "void", "@printlnInt", List.of("i64"), List.of(targetName), 1));
+            instructions.add(new Call(null, "void", "@printlnInt", List.of("i32"), List.of(targetName), 1));
             return instructions;
         } else if (name.equals("printInt")) {
             List<IRInstructions> instructions = new ArrayList<>();
             List<IRInstructions> ins = getExpressions(call.arguments.get(0), null, scope, null, null);
             if (ins != null) {instructions.addAll(ins);}
             String targetName = targetVariableName(ins, call.arguments.get(0), scope);
-            instructions.add(new Call(null, "void", "@printInt", List.of("i64"), List.of(targetName), 1));
+            instructions.add(new Call(null, "void", "@printInt", List.of("i32"), List.of(targetName), 1));
             return instructions;
         } else if (name.equals("getInt")) {
             List<IRInstructions> instructions = new ArrayList<>();
             String newTemp = "%ttemp." + tempIndexMap.size();
-            tempIndexMap.put(tempIndexMap.size(), "i64");
-            instructions.add(new Call(newTemp, "i64", "@getInt", new ArrayList<>(), new ArrayList<>(), 0));
+            tempIndexMap.put(tempIndexMap.size(), "i32");
+            instructions.add(new Call(newTemp, "i32", "@getInt", new ArrayList<>(), new ArrayList<>(), 0));
             return instructions;
         }
         FunctionItem func = null;
@@ -1319,11 +1342,20 @@ class IRGenerator extends IRInstructions {
         }
         if (func.parameters.size() != 0 && func.parameters.get(0).isSelf) {
             if (func.parameters.get(0).isReference) {
-                List<IRInstructions> ins = getExpressions(new UnaryExpression("&", call.call_, true), null, scope, null, null);
-                if (ins != null) {instructions.addAll(ins);}
-                String targetName = targetVariableName(ins, new UnaryExpression("&", call.call_, true), scope);
-                types.add("ptr");
-                values.add(targetName);
+                Type type = semantics.getType(scope, scope, call.call_);
+                if (type instanceof ReferenceType) {
+                    List<IRInstructions> ins = getExpressions(call.call_, null, scope, null, null);
+                    if (ins != null) {instructions.addAll(ins);}
+                    String targetName = targetVariableName(ins, call.call_, scope);
+                    types.add("ptr");
+                    values.add(targetName);
+                } else {
+                    List<IRInstructions> ins = getExpressions(new UnaryExpression("&", call.call_, true), null, scope, null, null);
+                    if (ins != null) {instructions.addAll(ins);}
+                    String targetName = targetVariableName(ins, new UnaryExpression("&", call.call_, true), scope);
+                    types.add("ptr");
+                    values.add(targetName);
+                }
             } else {
                 List<IRInstructions> ins = getExpressions(call.call_, null, scope, null, null);
                 if (ins != null) {instructions.addAll(ins);}
@@ -1459,7 +1491,7 @@ class IRGenerator extends IRInstructions {
                 String gepTemp = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), "ptr");
                 instructions.add(new Getelementptr(gepTemp, typeStr, newTemp, 
-                                                  Arrays.asList("i32", "i64"), 
+                                                  Arrays.asList("i32", "i32"),  
                                                   Arrays.asList("0", ((Integer)i).toString()), 2));
                 instructions.add(new Store(targetName, eleType, gepTemp));
             }
@@ -1477,7 +1509,7 @@ class IRGenerator extends IRInstructions {
                 String gepTemp = "%ttemp." + tempIndexMap.size();
                 tempIndexMap.put(tempIndexMap.size(), "ptr");
                 instructions.add(new Getelementptr(gepTemp, typeStr, newTemp, 
-                                                  Arrays.asList("i32", "i64"), 
+                                                  Arrays.asList("i32", "i32"), 
                                                   Arrays.asList("0", ((Integer)i).toString()), 2));
                 instructions.add(new Store(targetName, eleType, gepTemp));
             }
@@ -1619,6 +1651,13 @@ class IRGenerator extends IRInstructions {
         if (bodyIns != null) {instructions.addAll(bodyIns);}
         instructions.add(new Br(false, null, condLable, null));
         instructions.add(new Lable(endLable));
+        for (int i = 0; i < instructions.size(); i++) {
+            IRInstructions ins = instructions.get(i);
+            if (ins instanceof Alloca) {
+                instructions.remove(i);
+                instructions.add(0, ins);
+            }
+        }
         return instructions;
     }
     private List<IRInstructions> getIfExpression(boolean flag, Expression exp, Scope subScope, Scope scope, String startLable, String endLable, String endIfLable, String newTemp_) {
@@ -1952,8 +1991,8 @@ class IRGenerator extends IRInstructions {
         } else if (!(instructions.get(instructions.size() - 1) instanceof Ret)) {
             if (currentFunction.return_type instanceof ReferenceType) {
                 instructions.add(new Ret("ptr", null, false));
-            } else if (typeToString(currentFunction.return_type, root).equals("i64")) {
-                instructions.add(new Ret("i64", "0", false));
+            } else if (typeToString(currentFunction.return_type, root).equals("i32")) {
+                instructions.add(new Ret("i32", "0", false));
             } else if (typeToString(currentFunction.return_type, root).equals("i1")) {
                 instructions.add(new Ret("i1", "true", false));
             } else {
@@ -1982,15 +2021,15 @@ public class LLVMProgram {
             TypePath typePath = (TypePath)type;
             String name = typePath.name;
             if (name.equals("i32") || name.equals("u32")) {
-                return "i64";
+                return "i32";
             } else if (name.equals("isize") || name.equals("usize")) {
-                return "i64";
+                return "i32";
             } else if (name.equals("bool")) {
                 return "i1";
             } else if (name.equals("char")) {
                 return "i8";
             } else if (name.equals("114514")) {
-                return "i64";
+                return "i32";
             } else {
                 return "%struct." + name;
             }
@@ -2094,14 +2133,14 @@ public class LLVMProgram {
     }
     public void build() {
         List<String> typeList = new ArrayList<>();
-        typeList.add("i64");
+        typeList.add("i32");
         Header declareExit = new Header("@exit", "void", typeList, null);
         declareExit.isDeclare = true;
         this.instructions.add(declareExit);
         Header declarePrintln = new Header("@printlnInt", "void", typeList, null);
         declarePrintln.isDeclare = true;
         this.instructions.add(declarePrintln);
-        Header declareGetInt = new Header("@getInt", "i64", new ArrayList<>(), null);
+        Header declareGetInt = new Header("@getInt", "i32", new ArrayList<>(), null);
         declareGetInt.isDeclare = true;
         this.instructions.add(declareGetInt);
         Header declarePrint = new Header("@printInt", "void", typeList, null);

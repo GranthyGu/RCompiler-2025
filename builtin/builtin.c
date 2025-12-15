@@ -9,14 +9,21 @@ void exit(int code);
 // ==========================
 //   printInt(i64)
 // ==========================
-void printlnInt(long long x) {
-    printf("%lld\n", x);
+void printlnInt(int x) {
+    printf("%d\n", x);
 }
 
 // ==========================
-//   getInt() -> i64
+//   printInt(i32)
 // ==========================
-long long getInt() {
+void printInt(int x) {
+    printf("%d", x);
+}
+
+// ==========================
+//   getInt() -> i32
+// ==========================
+int getInt() {
     long long x;
     scanf("%lld", &x);
     return x;
@@ -28,12 +35,4 @@ long long getInt() {
 // ==========================
 void builtin_exit(int code) {
     exit(code);
-}
-
-// ==========================
-//   printInt(i64)
-//   (no newline)
-// ==========================
-void printInt(long long x) {
-    printf("%lld", x);
 }

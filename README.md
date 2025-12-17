@@ -19,7 +19,6 @@
 - [Usage](#usage)
 - [Compilation Pipeline](#compilation-pipeline)
 - [Supported Rust Features](#supported-rust-features)
-- [Dependencies](#dependencies)
 - [Testing](#testing)
 
 ---

@@ -311,9 +311,9 @@ class IRGenerator extends IRInstructions {
     public ImplItem currentImpl;
     private Map<Integer, String> tempIndexMap;
     private Semantics semantics;
-    private LLVMProgram llvm;
+    private IR llvm;
     public IRGenerator(FunctionItem fun, Map<String, Integer> variableNumMap, Map<String, String> variableTypeMap,
-                    ImplItem currentImpl, Scope root, Semantics semantics, Map<Integer, String> tempIndexMap, LLVMProgram llvm) {
+                    ImplItem currentImpl, Scope root, Semantics semantics, Map<Integer, String> tempIndexMap, IR llvm) {
         this.root = root;
         this.currentFunction = fun;
         this.variableNumMap = variableNumMap;
@@ -2008,7 +2008,7 @@ class IRGenerator extends IRInstructions {
     }
 }
 
-public class LLVMProgram {
+public class IR {
     public List<IRInstructions> instructions;
     private List<Item> program;
     private Scope root;
@@ -2091,7 +2091,7 @@ public class LLVMProgram {
         }
         return null;
     }
-    public LLVMProgram(Parser parser, Semantics semantics) {
+    public IR(Parser parser, Semantics semantics) {
         this.root = semantics.root;
         program = parser.program.nodes;
         this.instructions = new ArrayList<>();

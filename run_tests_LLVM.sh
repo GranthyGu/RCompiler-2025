@@ -1,11 +1,20 @@
+#!/bin/bash
+
 BASE="rcompiler2025_testcases/semantic-2"
 BUILTIN="builtin/builtin.o"
-
+TOTAL_TESTS=50
+PASS_COUNT=0
 trim_trailing_blank_lines() {
     awk 'NF { last=NR } { lines[NR]=$0 } END { for (i=1; i<=last; i++) print lines[i] }' "$1"
 }
-ulimit -s unlimited
-for i in $(seq 1 50); do
+
+ulimit -s 65532 2>/dev/null || true
+
+echo "=================================================="
+echo "               🚀 Running LLVM Test               "
+echo "=================================================="
+
+for i in $(seq 1 $TOTAL_TESTS); do
     DIR="$BASE/comprehensive$i"
     LLFILE="$DIR/comprehensive$i.ll"
     OBJFILE="$DIR/in.o"
@@ -14,19 +23,20 @@ for i in $(seq 1 50); do
     EXPECTED="$DIR/comprehensive$i.out"
     INPUTFILE="$DIR/comprehensive$i.in"
 
-    echo "=============================="
-    echo "Processing comprehensive$i ..."
-    echo "LL File: $LLFILE"
+    if [ ! -f "$LLFILE" ]; then
+        echo "⚠️  [$i/$TOTAL_TESTS] LL File not found: $LLFILE"
+        continue
+    fi
 
     clang -c "$LLFILE" -o "$OBJFILE"
     if [ $? -ne 0 ]; then
-        echo "❌ clang failed for comprehensive$i"
+        echo "❌ [$i/$TOTAL_TESTS] Clang failed"
         continue
     fi
 
     clang "$OBJFILE" "$BUILTIN" -o "$OUTFILE"
     if [ $? -ne 0 ]; then
-        echo "❌ Linking failed for comprehensive$i"
+        echo "❌ [$i/$TOTAL_TESTS] Linking failed"
         continue
     fi
 
@@ -36,26 +46,33 @@ for i in $(seq 1 50); do
         "$OUTFILE" > "$RESULTFILE" 2>&1
     fi
 
-    echo "Done: output saved to $RESULTFILE"
-
     CLEAN_RESULT="$(trim_trailing_blank_lines "$RESULTFILE")"
 
-    if [ -z "$CLEAN_RESULT" ]; then
-        echo "❌ ERROR: output is empty after trimming trailing blank lines (comprehensive$i)"
-        continue
-    fi
-
     if [ -f "$EXPECTED" ]; then
-        if diff -q \
-            <(printf "%s\n" "$CLEAN_RESULT") \
-            <(trim_trailing_blank_lines "$EXPECTED") \
-            > /dev/null; then
-            echo "✅ WONDERFUL!!!! ✨ (Test $i matched expected output)"
+        if diff -q <(printf "%s\n" "$CLEAN_RESULT") <(trim_trailing_blank_lines "$EXPECTED") > /dev/null; then
+            echo "✅ [$i/$TOTAL_TESTS] comprehensive$i: PASS"
+            ((PASS_COUNT++))
         else
-            echo "❌ Output mismatch for comprehensive$i"
+            echo "❌ [$i/$TOTAL_TESTS] comprehensive$i: FAIL (Output mismatch)"
         fi
     else
-        echo "⚠️  Expected output file not found: $EXPECTED"
+        echo "⚠️  [$i/$TOTAL_TESTS] comprehensive$i: FAIL (Expected output missing)"
     fi
 
 done
+
+echo ""
+echo "=================================================="
+echo "                测试结果汇总                      "
+echo "=================================================="
+
+if [ "$PASS_COUNT" -eq "$TOTAL_TESTS" ]; then
+    echo "🎉 太棒了！全部通过！"
+    echo "🏆 最终成绩: $PASS_COUNT / $TOTAL_TESTS (100%)"
+else
+    echo "📊 测试完成。"
+    echo "✅ 成功: $PASS_COUNT"
+    echo "❌ 失败: $((TOTAL_TESTS - PASS_COUNT))"
+    echo "📉 通过率: $PASS_COUNT / $TOTAL_TESTS"
+fi
+echo "=================================================="

@@ -716,6 +716,43 @@ class IRGenerator extends IRInstructions {
         System.out.println("Unmatch Expression!" + exp.getClass().getName());
         return null;
     }
+    private List<IRInstructions> getConditionInstructions(Expression exp, Scope subScope, Scope scope, String trueLable, String falseLable) {
+        List<IRInstructions> instructions = new ArrayList<>();
+        if (exp instanceof GroupedExpression) {
+            return getConditionInstructions(((GroupedExpression) exp).inner, subScope, scope, trueLable, falseLable);
+        }
+        if (exp instanceof BinaryExpression) {
+            BinaryExpression binary = (BinaryExpression) exp;
+            if (binary.operator.equals("&&")) {
+                String checkRightLabel = "and_rhs_" + tempIndexMap.size();
+                tempIndexMap.put(tempIndexMap.size(), "lable");
+                instructions.addAll(getConditionInstructions(binary.left, subScope, scope, checkRightLabel, falseLable));
+                instructions.add(new Lable(checkRightLabel));
+                instructions.addAll(getConditionInstructions(binary.right, subScope, scope, trueLable, falseLable));
+                return instructions;
+            } else if (binary.operator.equals("||")) {
+                String checkRightLabel = "or_rhs_" + tempIndexMap.size();
+                tempIndexMap.put(tempIndexMap.size(), "lable");
+                instructions.addAll(getConditionInstructions(binary.left, subScope, scope, trueLable, checkRightLabel));
+                instructions.add(new Lable(checkRightLabel));
+                instructions.addAll(getConditionInstructions(binary.right, subScope, scope, trueLable, falseLable));
+                return instructions;
+            }
+        }
+        if (exp instanceof UnaryExpression) {
+            UnaryExpression unary = (UnaryExpression) exp;
+            if (unary.operator.equals("!")) {
+                return getConditionInstructions(unary.operand, subScope, scope, falseLable, trueLable);
+            }
+        }
+        List<IRInstructions> evalIns = getExpressions(exp, subScope, scope, null, null);
+        if (evalIns != null) {
+            instructions.addAll(evalIns);
+        }
+        String condVar = targetVariableName(instructions, exp, scope);
+        instructions.add(new Br(true, condVar, trueLable, falseLable));
+        return instructions;
+    }
     private List<IRInstructions> getBinaryExpression(Expression exp, Scope scope) {
         BinaryExpression binary = (BinaryExpression)exp;
         List<IRInstructions> instructions = new ArrayList<>();
@@ -1641,10 +1678,8 @@ class IRGenerator extends IRInstructions {
         instructions.add(new Br(false, null, condLable, null));
         instructions.add(new Lable(condLable));
         WhileExpression whileExp = (WhileExpression)exp;
-        List<IRInstructions> condIns = getExpressions(whileExp.condition, null, scope, null, null);
-        if (condIns != null) {instructions.addAll(condIns);}
-        String condVar = targetVariableName(condIns, whileExp.condition, scope);
-        instructions.add(new Br(true, condVar, bodyLable, endLable));
+        List<IRInstructions> condIns = getConditionInstructions(whileExp.condition, null, scope, bodyLable, endLable);
+        if (condIns != null) { instructions.addAll(condIns); }
         instructions.add(new Lable(bodyLable));
         List<IRInstructions> bodyIns = getBlockExpression(whileExp.body, subScope, condLable, endLable);
         if (bodyIns != null) {instructions.addAll(bodyIns);}
@@ -1678,29 +1713,20 @@ class IRGenerator extends IRInstructions {
             endIfLable = "end_if_" + num;
         }
         String elseLable = "else_" + num;
-        List<IRInstructions> condIns = getExpressions(ifExp.condition, null, scope, null, null);
-        if (condIns != null) {instructions.addAll(condIns);}
-        String condVar = targetVariableName(condIns, ifExp.condition, scope);
-        if (ifExp.else_branch == null) {
-            instructions.add(new Br(true, condVar, thenLable, endIfLable));
-            instructions.add(new Lable(thenLable));
-            List<IRInstructions> thenIns = getBlockExpression(ifExp.then_branch, subScope, startLable, endLable);
-            if (thenIns != null) {instructions.addAll(thenIns);}
-            instructions.add(new Br(false, null, endIfLable, null));
-            instructions.add(new Lable(endIfLable));
-            return instructions;
-        } else {
-            instructions.add(new Br(true, condVar, thenLable, elseLable));
-            instructions.add(new Lable(thenLable));
-            List<IRInstructions> thenIns = getBlockExpression(ifExp.then_branch, subScope, startLable, endLable);
-            if (thenIns != null) {instructions.addAll(thenIns);}
-            if (flag) {
-                String variable = targetVariableName(thenIns, ifExp.then_branch, subScope);
-                int lastDot = newTemp.lastIndexOf('.');
-                Integer index = Integer.parseInt(newTemp.substring(lastDot + 1));
-                instructions.add(new Store(variable, tempIndexMap.get(index), newTemp));
-            }
-            instructions.add(new Br(false, null, endIfLable, null));
+        String targetFalseLable = (ifExp.else_branch == null) ? endIfLable : elseLable;
+        List<IRInstructions> condIns = getConditionInstructions(ifExp.condition, null, scope, thenLable, targetFalseLable);
+        if (condIns != null) { instructions.addAll(condIns); }
+        instructions.add(new Lable(thenLable));
+        List<IRInstructions> thenIns = getBlockExpression(ifExp.then_branch, subScope, startLable, endLable);
+        if (thenIns != null) {instructions.addAll(thenIns);}
+        if (flag) {
+            String variable = targetVariableName(thenIns, ifExp.then_branch, subScope);
+            int lastDot = newTemp.lastIndexOf('.');
+            Integer index = Integer.parseInt(newTemp.substring(lastDot + 1));
+            instructions.add(new Store(variable, tempIndexMap.get(index), newTemp));
+        }
+        instructions.add(new Br(false, null, endIfLable, null));
+        if (ifExp.else_branch != null) {
             instructions.add(new Lable(elseLable));
             if (ifExp.else_branch instanceof IfExpression) {
                 List<IRInstructions> elseIns = getIfExpression(flag, ifExp.else_branch, ifExp.sta.scope, scope, startLable, endLable, endIfLable, newTemp);
@@ -1716,16 +1742,18 @@ class IRGenerator extends IRInstructions {
                 }
                 instructions.add(new Br(false, null, endIfLable, null));
                 instructions.add(new Lable(endIfLable));
-                if (flag) {
-                    int lastDot = newTemp.lastIndexOf('.');
-                    Integer index = Integer.parseInt(newTemp.substring(lastDot + 1));
-                    String newTemp__ = "%ttemp." + tempIndexMap.size();
-                    tempIndexMap.put(tempIndexMap.size(), tempIndexMap.get(index));
-                    instructions.add(new Load(newTemp__, tempIndexMap.get(index), newTemp));
-                }
             }
-            return instructions;
+        } else {
+            instructions.add(new Lable(endIfLable));
         }
+        if (flag) {
+            int lastDot = newTemp.lastIndexOf('.');
+            Integer index = Integer.parseInt(newTemp.substring(lastDot + 1));
+            String newTemp__ = "%ttemp." + tempIndexMap.size();
+            tempIndexMap.put(tempIndexMap.size(), tempIndexMap.get(index));
+            instructions.add(new Load(newTemp__, tempIndexMap.get(index), newTemp));
+        }
+        return instructions;
     }
     public void build() {
         // System.out.println(currentFunction.name);

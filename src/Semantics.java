@@ -1458,6 +1458,7 @@ public class Semantics {
                 }
                 return target.isMut;
             }
+            boolean flag = false;
             for (Statement sta : scope.statements) {
                 if (sta instanceof ExpressionStatement) {
                     ExpressionStatement sta_ = (ExpressionStatement)sta;
@@ -1478,11 +1479,15 @@ public class Semantics {
                     if (pattern__.name.equals(name)) {
                         if (((LetStatement)sta).type instanceof ReferenceType) {
                             ReferenceType r = (ReferenceType)((LetStatement)sta).type;
-                            return r.isMut;
+                            flag = r.isMut;
+                        } else {
+                            flag = pattern__.isMut;
                         }
-                        return pattern__.isMut;
                     }
                 }
+            }
+            if (flag) {
+                return flag;
             }
             if (scope.parent == null) {
                 has_error = true;
@@ -2240,27 +2245,14 @@ public class Semantics {
         }
         return null;
     }
-    private boolean firstCheckScope() {
+    public boolean semanticCheck() {
         buildScope();
-        printScopeTree();
         System.out.println("=== Semantic Check Results ===");
         boolean allPassed = true;
-
         boolean ok6 = checkImpl(root);
         System.out.println("checkImpl(): " + ok6);
         allPassed &= ok6;
-
-        if (has_error) {
-            System.out.println("has_error: true");
-        } else {
-            System.out.println("has_error: false");
-        }
         checkStatements(root);
-        if (has_error) {
-            System.out.println("has_error: true");
-        } else {
-            System.out.println("has_error: false");
-        }
         boolean ok1 = checkExit();
         System.out.println("checkExit(): " + ok1);
         allPassed &= ok1;
@@ -2281,71 +2273,5 @@ public class Semantics {
         }
         System.out.println("==============================");
         return allPassed;
-    }
-    public boolean semanticCheck() {
-        return firstCheckScope();
-    }
-    public void printScopeTree() {
-        // System.out.println("===== Scope Tree =====");
-        // printScopeRecursive(root, 0);
-        // System.out.println("======================");
-    }
-    
-    private void printScopeRecursive(Scope scope, int indent) {
-        if (scope == null) return;
-        String prefix = " ".repeat(indent * 2);
-    
-        System.out.println(prefix + "Scope {");
-        System.out.println(prefix + "  Kind: " + scope.type);
-        System.out.println(scope.name);
-    
-        if (scope.returnType != null)
-            System.out.println(prefix + "  ReturnType: " + scope.returnType);
-    
-        if (scope.returnExpression != null)
-            System.out.println(prefix + "  ReturnExpression: " + scope.returnExpression);
-    
-        if (scope.traitName != null)
-            System.out.println(prefix + "  TraitName: " + scope.traitName);
-    
-        if (scope.typeStruct != null)
-            System.out.println(prefix + "  ImplType: " + scope.typeStruct);
-    
-        if (scope.traitItem != null)
-            System.out.println(prefix + "  TraitItem: " + scope.traitItem.name);
-    
-        if (scope.isSelf || scope.isMut || scope.isReference)
-            System.out.println(prefix + String.format("  SelfParam: [isSelf=%b, isMut=%b, isRef=%b]", 
-                scope.isSelf, scope.isMut, scope.isReference));
-    
-        if (!scope.typeMap.isEmpty()) {
-            System.out.println(prefix + "  TypeMap:");
-            for (Map.Entry<String, Item> entry : scope.typeMap.entrySet()) {
-                System.out.println(prefix + "    " + entry.getKey() + " : " + entry.getValue().getClass().getSimpleName());
-            }
-        }
-    
-        if (!scope.valueMap.isEmpty()) {
-            System.out.println(prefix + "  ValueMap:");
-            for (Map.Entry<String, Item> entry : scope.valueMap.entrySet()) {
-                System.out.println(prefix + "    " + entry.getKey() + " : " + entry.getValue().getClass().getSimpleName());
-            }
-        }
-    
-        if (!scope.statements.isEmpty()) {
-            System.out.println(prefix + "  Statements:");
-            for (Statement stmt : scope.statements) {
-                System.out.println(prefix + "    - " + stmt.getClass().getSimpleName());
-            }
-        }
-    
-        if (!scope.children.isEmpty()) {
-            System.out.println(prefix + "  Children:");
-            for (Scope child : scope.children) {
-                printScopeRecursive(child, indent + 2);
-            }
-        }
-    
-        System.out.println(prefix + "}");
     }
 }

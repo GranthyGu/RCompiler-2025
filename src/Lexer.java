@@ -1,5 +1,9 @@
 package rcompiler2025.src;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 
 enum TokenType {
@@ -81,8 +85,13 @@ public class Lexer {
      * @param file_name: the name of the rust program, ready to compile.
      * @operation initialize the lists of keywords.
      */
-    public Lexer(String input) {
-        SrcCode = input;
+    public Lexer(String file_name) {
+        try {
+            byte[] content = Files.readAllBytes(Paths.get(file_name));
+            SrcCode = new String(content, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         String[] strict_keywords = {"as", "break", "const", "continue", "crate", "else",
                                     "enum", "false", "fn", "for", "if", "impl", 
                                     "in", "let", "loop", "match", "mod", "move", "mut", 

@@ -304,8 +304,11 @@ cat hello.rx | make run > hello.ll
 ### Run Tests
 
 ```bash
-# Automated test suite
+# Automated test suite, generate the LLVM
 ./run_tests.sh
+
+# Automated test the LLVM, judge the output
+./run_tests_LLVM.sh
 
 # Results are saved in result/ directory
 cat result/total_result.txt

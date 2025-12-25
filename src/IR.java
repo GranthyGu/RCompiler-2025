@@ -622,7 +622,6 @@ class IRGenerator extends IRInstructions {
         } else if (exp instanceof GroupedExpression) {
             return targetVariableName(instructions, ((GroupedExpression)exp).inner, scope);
         }
-        System.out.println("Unmatch Expression!!" + exp.getClass().getName());
         return null;
     }
     private String targetVariableNameLeft(List<IRInstructions> instructions, Expression exp, Scope scope) {

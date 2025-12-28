@@ -8,7 +8,7 @@ trim_trailing_blank_lines() {
     awk 'NF { last=NR } { lines[NR]=$0 } END { for (i=1; i<=last; i++) print lines[i] }' "$1"
 }
 
-ulimit -s 65532 2>/dev/null || true
+ulimit -s unlimited
 
 echo "=================================================="
 echo "               🚀 Running LLVM Test               "

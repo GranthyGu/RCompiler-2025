@@ -8,11 +8,11 @@ trim_trailing_blank_lines() {
     awk 'NF { last=NR } { lines[NR]=$0 } END { for (i=1; i<=last; i++) print lines[i] }' "$1"
 }
 
-ulimit -s unlimited
-
 echo "=================================================="
 echo "               🚀 Running LLVM Test               "
 echo "=================================================="
+
+ulimit -s unlimited
 
 for i in $(seq 1 $TOTAL_TESTS); do
     DIR="$BASE/comprehensive$i"
